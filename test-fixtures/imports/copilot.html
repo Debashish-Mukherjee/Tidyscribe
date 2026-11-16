@@ -1,0 +1,7 @@
+<div class="ac-textBlock" style="font-size:14px;font-family:Segoe UI"><p>Here is the <strong>fix</strong> for the retry bug:</p><ul><li>Update <code>config.py</code></li><li>Restart the service</li></ul>
+<div class="ac-codeBlock"><div class="header" style="display:flex"><span>json</span><button class="copy-button" aria-label="Copy">Copy</button></div><pre><code>{ "retries": 3, "backoff": "exponential" }</code></pre></div>
+<p>And the shell side:</p>
+<div class="ac-codeBlock"><div class="header"><span>bash</span><button class="copy-button">Copy</button></div><pre><code>systemctl restart workbench
+journalctl -u workbench -f</code></pre></div>
+<table><thead><tr><th>Setting</th><th>Value</th></tr></thead><tbody><tr><td>retries</td><td>3</td></tr></tbody></table>
+<p>Let me know if you want the Terraform version too.</p></div>

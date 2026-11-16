@@ -1,0 +1,102 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: docworkbench
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d docworkbench"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: ./backend
+      additional_contexts:
+        certs: /home/debashish
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/docworkbench
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: http://localhost:3000
+      SECRET_KEY: change-me
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SSL_CERT_FILE: /tmp/Zscalar_root_CA.crt
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads_data:/app/data/uploads
+      - exports_data:/app/data/exports
+      - previews_data:/app/data/previews
+      - diagrams_data:/app/data/diagrams
+      - templates_data:/app/data/templates
+      - generated_data:/app/data/generated
+
+  worker:
+    build:
+      context: ./backend
+      args:
+        INSTALL_DOC_TOOLS: ${INSTALL_DOC_TOOLS:-true}
+      additional_contexts:
+        certs: /home/debashish
+    command: celery -A app.tasks worker --loglevel=info
+    environment:
+      EXPORT_ENGINE: ${EXPORT_ENGINE:-python}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/docworkbench
+      REDIS_URL: redis://redis:6379/0
+      SSL_CERT_FILE: /tmp/Zscalar_root_CA.crt
+    depends_on:
+      - backend
+      - redis
+    volumes:
+      - uploads_data:/app/data/uploads
+      - exports_data:/app/data/exports
+      - previews_data:/app/data/previews
+      - diagrams_data:/app/data/diagrams
+      - templates_data:/app/data/templates
+      - generated_data:/app/data/generated
+
+  frontend:
+    build:
+      context: ./frontend
+      target: runner
+      args:
+        # Inlined into the browser bundle at build time; rebuild the image to change it.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      additional_contexts:
+        certs: /home/debashish
+    environment:
+      # Read at container start; must be the URL the browser uses to reach the API.
+      API_URL: ${API_URL:-http://localhost:8000}
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
+  exports_data:
+  previews_data:
+  diagrams_data:
+  templates_data:
+  generated_data:

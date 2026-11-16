@@ -1,0 +1,64 @@
+{
+  "word.html": {
+    "mustContain": [
+      "# Quarterly Report", "**bold**", "*italic*", "[the Q3 dashboard](https://example.com/q3)",
+      "- Revenue up 12%", "  - EMEA drove most of it", "1. Close the books",
+      "| **Name** | **Role** | **Score** |", "| Ada | **Engineer** | *9* |", "[portfolio](https://example.com/bob)",
+      "<table>", "colspan=\"2\"", "rowspan=\"2\"", "<ul><li>On-call rota</li><li>Runbooks</li></ul>", "<strong>planning</strong>"
+    ],
+    "mustNotContain": ["mso-", "<o:p>", "&nbsp;", "\u00a0", "·", "StartFragment"],
+    "noLineMatches": ["^\\|$", "^\\| \\*\\*Name\\*\\*$"]
+  },
+  "outlook.html": {
+    "mustContain": [
+      "[https://example.com/design/v2](https://example.com/design/v2)",
+      "[deployment runbook](https://example.com/runbook?id=7&tab=steps)", "**Action items:**", "- Ship the thing", "**Subject:** Plan"
+    ],
+    "mustNotContain": ["safelinks", "WordSection", "<o:p>", "mso-"]
+  },
+  "teams.html": {
+    "mustContain": [
+      "> **Ada Lovelace** *10:01 AM*", "> Can you check the build before the release call?", "😀", "👍",
+      "- Re-run the pipeline", "[CI logs](https://example.com/ci/123)", "kubectl get pods -n prod", "**10:30**"
+    ],
+    "mustNotContain": ["schema.skype.com", "statics.teams", "itemprop", "Ada Lovelace10:01", "10:01 AMCan"]
+  },
+  "github.html": {
+    "mustContain": [
+      "## Install", "npm install workbench", "<kbd>Ctrl</kbd>", "H<sub>2</sub>O", "🎉", "[@octocat](https://github.com/octocat)",
+      "[^1]", "[^1]: Thanks to everyone", "- [ ] Write tests", "- [x] Ship it", "> [!WARNING]", "> Back up your data before upgrading.",
+      "<details open>", "<summary>Troubleshooting</summary>"
+    ],
+    "mustNotContain": ["[](#", "Permalink", "octicon", "M7.775", "Copy", "↩"]
+  },
+  "confluence.html": {
+    "mustContain": [
+      "> [!NOTE]", "> [!IMPORTANT]", "> [!WARNING]", "> [!TIP]", "```java", "public class Order {",
+      "- [ ] Review the design", "- [x] Approve the budget", "- [ ] Book the launch room", "- [x] Send the invitations",
+      "| Service | Owner |", "| Billing | Ada |", "<summary>Rollback plan</summary>"
+    ],
+    "mustNotContain": ["confluence", "☐", "☑", "aui-icon", "syntaxhighlighter", "brush:"]
+  },
+  "gemini.html": {
+    "mustContain": [
+      "```python", "def deploy(env):", "```json", "| Option | Cost |", "**Expand** the cluster", "Keep the previous release for 24 hours.",
+      "use the following steps. The config is shown below:"
+    ],
+    "mustNotContain": ["Copy code", "following steps1", "below2", "ng-star-inserted", "table-block"],
+    "noLineMatches": ["^(Python|JSON)$"]
+  },
+  "copilot.html": {
+    "mustContain": ["```json", "```bash", "**fix**", "- Update `config.py`", "| Setting | Value |", "Let me know if you want the Terraform version too."],
+    "mustNotContain": ["Copy", "ac-textBlock"],
+    "noLineMatches": ["^(json|bash)$"]
+  },
+  "chatgpt.md": {
+    "paste": "plain",
+    "mustContain": ["```python", "def project(event):", "| Name | Role | Owner |", "| API | Gateway | Ada |", "Latency matters[^1]"],
+    "mustNotContain": ["ChatGPT said:", "Copy code"],
+    "noLineMatches": ["^python$"]
+  },
+  "claude.md": {
+    "paste": "untouched"
+  }
+}

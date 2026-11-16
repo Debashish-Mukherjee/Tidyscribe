@@ -1,0 +1,325 @@
+a {
+    text-decoration: none;
+    color: #464feb;
+}
+tr th, tr td {
+    border: 1px solid #e6e6e6;
+}
+tr th {
+    background-color: #f5f5f5;
+}
+That changes the observability model significantly. I would think of it as **two parallel outputs from Zabbix Server**, not a linear chain:
+
+               +--> MySQL
+               |
+Zabbix Proxy -> Zabbix Server
+               |
+               +--> Golang Producer -> Kafka -> Golang Consumer -> VictoriaMetrics
+
+So the most important architectural question becomes:
+
+> "Is the Kafka/VictoriaMetrics stream faithfully representing what Zabbix Server processed?"
+
+not
+
+> "Is data flowing from MySQL to Kafka?"
+
+Because MySQL and Kafka are siblings downstream of Zabbix Server.
+
+## Observability Domains
+
+I would split instrumentation into 4 domains.
+
+### 1. Source Domain (Zabbix)
+
+You already collect Zabbix internal metrics, which is good.
+
+Add a view for:
+
+items processed/sec
+history writes/sec
+events generated/sec
+triggers generated/sec
+
+These become the baseline throughput metrics for the entire platform.
+
+Think of these as:
+
+Source Truth Metrics
+
+Everything downstream should roughly reconcile against them.
+
+---
+
+### 2. Stream Export Domain (Zabbix Server → Producer)
+
+This is now the most critical observability gap.
+
+Instrument the Go producer service with:
+
+zabbix_events_received_total
+zabbix_events_exported_total
+zabbix_events_failed_total
+
+and
+
+export_latency_seconds
+
+Questions answered:
+
+- Did Zabbix produce an event?
+- Did producer receive it?
+- Did producer publish it?
+
+---
+
+### Key Metric: Export Success Ratio
+
+exported_total / received_total
+
+Alert if below:
+
+99.9%
+
+or whatever SLA is appropriate.
+
+---
+
+### 3. Kafka Transport Domain
+
+You already have Kafka Exporter.
+
+Continue collecting:
+
+broker health
+ISR count
+topic throughput
+consumer lag
+partition status
+
+But add application-level metrics too.
+
+Producer:
+
+kafka_publish_success_total
+kafka_publish_failure_total
+kafka_publish_duration_seconds
+message_size_bytes
+
+Consumer:
+
+messages_consumed_total
+processing_failures_total
+processing_duration_seconds
+
+---
+
+### Critical Kafka Architecture Metric
+
+Message-size distribution:
+
+message_size_bytes
+
+Histogram:
+
+P50
+P95
+P99
+MAX
+
+Given your earlier investigation into Kafka message limits, this becomes a capacity-planning metric.
+
+---
+
+### 4. Sink Domain (Consumer → VictoriaMetrics)
+
+Track:
+
+vm_write_attempts_total
+vm_write_success_total
+vm_write_failures_total
+vm_write_duration_seconds
+
+Plus:
+
+last_successful_write_timestamp
+
+This catches:
+
+consumer healthy
+Kafka healthy
+
+but
+
+VictoriaMetrics rejected writes
+
+which otherwise can be surprisingly difficult to detect.
+
+---
+
+# Most Valuable New Metric: Data Freshness
+
+I would prioritize this above almost everything else.
+
+Add a timestamp originating from Zabbix:
+
+{
+  "event_time": "..."
+}
+
+Measure:
+
+## At Producer
+
+now - event_time
+
+## At Consumer
+
+now - event_time
+
+## After Write to VictoriaMetrics
+
+now - event_time
+
+Expose:
+
+pipeline_freshness_seconds
+
+Dashboard:
+
+P50
+P95
+P99
+MAX
+
+Then you can immediately answer:
+
+> "How old is the newest data visible in VictoriaMetrics?"
+
+which is often the business KPI Ops cares about.
+
+---
+
+# Most Valuable Reconciliation Metric
+
+Since MySQL and Kafka both originate from Zabbix Server, create reconciliation metrics.
+
+Example:
+
+Zabbix events generated
+            |
+            +----> MySQL records
+            |
+            +----> Kafka messages
+
+Track hourly totals:
+
+zabbix_events_total
+
+producer_exported_total
+
+consumer_processed_total
+
+vm_written_total
+
+Visualize all four on the same graph.
+
+A divergence immediately indicates:
+
+loss
+duplication
+backpressure
+
+somewhere in the streaming path.
+
+---
+
+# Correlation IDs
+
+I'd strongly recommend this.
+
+Generate:
+
+event_id
+
+at the producer boundary.
+
+Carry it through:
+
+Kafka Header
+
+or payload.
+
+Then a support engineer can trace:
+
+Zabbix Event
+    ↓
+Producer Log
+    ↓
+Kafka Message
+    ↓
+Consumer Log
+    ↓
+VictoriaMetrics Write
+
+without guessing.
+
+---
+
+# OpenTelemetry
+
+If you are investing in observability modernization, the best candidates are:
+
+Golang Producer
+Golang Consumer
+
+Instrument:
+
+Receive Event
+Publish Kafka
+Consume Kafka
+Write VictoriaMetrics
+
+Even if you don't deploy a full tracing backend immediately, the trace IDs become invaluable during incident investigations.
+
+---
+
+# Architect-Level Dashboard Layout
+
+I'd build a single "Data Pipeline Health" dashboard:
+
+Zabbix Events/sec
+        ↓
+Producer Export Rate
+        ↓
+Kafka Topic Rate
+        ↓
+Consumer Rate
+        ↓
+VictoriaMetrics Write Rate
+
+Alongside:
+
+Pipeline Freshness (P95)
+
+Consumer Lag
+
+Producer Error Rate
+
+Consumer Error Rate
+
+VictoriaMetrics Write Failures
+
+Message Size P95/P99
+
+Last Successful Write Age
+
+## My Top 5 Priorities
+
+1. **Pipeline freshness (event age)**
+2. **End-to-end event accounting/reconciliation**
+3. **Producer and consumer custom metrics**
+4. **Message size distribution**
+5. **Correlation IDs / OpenTelemetry trace IDs**
+
+Those five additions will give far more operational value than adding more infrastructure metrics, because they'll tell you whether the **actual monitoring data** is arriving correctly and on time, not merely whether the servers are healthy.

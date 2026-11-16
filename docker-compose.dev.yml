@@ -1,0 +1,10 @@
+# Development overrides: hot-reloading Next.js dev server instead of the production image.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+services:
+  frontend:
+    build:
+      target: dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next

@@ -1,0 +1,14 @@
+<meta charset="utf-8"><h2 id="Design-Overview">Design Overview</h2>
+<div class="confluence-information-macro confluence-information-macro-information"><span class="aui-icon aui-icon-small aui-iconfont-info confluence-information-macro-icon"></span><div class="confluence-information-macro-body"><p>The service is stateless and horizontally scalable.</p></div></div>
+<div class="confluence-information-macro confluence-information-macro-note"><span class="aui-icon aui-icon-small aui-iconfont-warning confluence-information-macro-icon"></span><div class="confluence-information-macro-body"><p>Remember to migrate the schema.</p></div></div>
+<div class="confluence-information-macro confluence-information-macro-warning"><span class="aui-icon aui-icon-small aui-iconfont-error confluence-information-macro-icon"></span><div class="confluence-information-macro-body"><p>Do not run migrations during the release window.</p></div></div>
+<div class="confluence-information-macro confluence-information-macro-tip"><span class="aui-icon aui-icon-small aui-iconfont-approve confluence-information-macro-icon"></span><div class="confluence-information-macro-body"><p>Use the read replica for reports.</p></div></div>
+<div class="confluence-information-macro confluence-information-macro-success"><span class="aui-icon aui-icon-small aui-iconfont-approve confluence-information-macro-icon"></span><div class="confluence-information-macro-body"><p>Load test passed at 2k rps.</p></div></div>
+<div class="code panel pdl" style="border-width: 1px;"><div class="codeHeader panelHeader pdl"><b>Order.java</b></div><div class="codeContent panelContent pdl"><pre class="syntaxhighlighter-pre" data-syntaxhighlighter-params="brush: java; gutter: false; theme: Confluence" data-theme="Confluence">public class Order {
+    private final long id;
+}</pre></div></div>
+<div class="table-wrap"><table class="confluenceTable"><tbody><tr><th class="confluenceTh">Service</th><th class="confluenceTh">Owner</th></tr><tr><td class="confluenceTd">Billing</td><td class="confluenceTd">Ada</td></tr><tr><td class="confluenceTd">Search</td><td class="confluenceTd">Bob</td></tr></tbody></table></div>
+<ul class="inline-task-list"><li data-inline-task-id="1"><span class="placeholder-inline-tasks">Review the design</span></li><li class="checked" data-inline-task-id="2"><span class="placeholder-inline-tasks">Approve the budget</span></li></ul>
+<p>☐ Book the launch room</p>
+<p>☑ Send the invitations</p>
+<div class="expand-container"><div class="expand-control"><span class="expand-control-icon"></span><span class="expand-control-text">Rollback plan</span></div><div class="expand-content"><p>Revert the deployment and restore the snapshot.</p></div></div>

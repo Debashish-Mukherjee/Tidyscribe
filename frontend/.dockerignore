@@ -1,0 +1,9 @@
+node_modules
+.next
+coverage
+playwright-report
+test-results
+tests
+vitest.config.ts
+playwright.config.ts
+*.log

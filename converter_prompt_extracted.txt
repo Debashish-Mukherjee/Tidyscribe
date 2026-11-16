@@ -1,0 +1,425 @@
+You are acting as the lead software architect, staff engineer, DevOps engineer, UX designer, QA engineer, and technical writer for this project.
+Your goal is to design and implement a complete production-ready self-hosted application called:
+AI Document Workbench
+Do not generate high-level proposals.
+Implement the solution.
+Create code, configuration, tests, Docker assets, documentation, database schema, and deployment artifacts.
+When requirements are ambiguous, choose the simplest production-grade solution.
+Product Vision
+AI Document Workbench helps users transform chatbot output into professional documents.
+Primary use cases:
+Copy content from ChatGPT
+Copy content from Claude
+Copy content from Gemini
+Copy content from Copilot
+Copy content from Codex
+Then:
+normalize formatting
+render diagrams
+clean AI-generated text
+preview documents
+export to DOCX
+export to PDF
+export to HTML
+export to Markdown
+The application is optimized for technical professionals:
+Solution Architects
+Developers
+SREs
+Engineers
+Technical Writers
+Business Analysts
+The application is NOT:
+a document management system
+a SharePoint replacement
+a collaboration platform
+an Office clone
+Technology Stack
+Use only:
+Frontend
+Next.js 15
+TypeScript
+Tailwind CSS
+shadcn/ui
+TipTap
+Zustand
+React Query
+Backend
+FastAPI
+Python 3.13
+Pydantic
+SQLAlchemy 2
+Alembic
+Async Processing
+Celery
+Redis
+Persistence
+PostgreSQL
+MinIO
+Conversion
+Pandoc
+LibreOffice Headless
+Mermaid CLI
+Deployment
+Docker Compose
+Linux
+Never introduce .NET, Java, PHP, or Node backend frameworks.
+Architecture Principles
+Follow these principles:
+Modular Monolith
+Do NOT create microservices.
+Build a modular monolith.
+Backend modules:
+auth
+documents
+editor
+templates
+transformations
+exports
+snippets
+history
+settings
+jobs
+storage
+API First
+Every feature must be available via REST API.
+Generate OpenAPI docs.
+Swagger UI enabled.
+Background Processing
+Long-running operations must never block HTTP requests.
+Use Celery for:
+pdf generation
+docx generation
+diagram rendering
+mermaid processing
+document imports
+large exports
+UI Requirements
+Theme
+Default theme:
+Dark
+Provide:
+Dark Theme
+Light Theme
+System Theme
+Persist preference.
+Dark theme should resemble:
+VS Code
+GitHub Dark
+Azure Portal
+Palette:
+Background: #0d1117
+Panel: #161b22
+Border: #30363d
+Text: #c9d1d9
+Primary: #58a6ff
+Success: #3fb950
+Warning: #d29922
+Error: #f85149
+Layout
+Desktop-first.
+Responsive.
+Layout:
+Header
+├─ Left Sidebar
+│  ├ Documents
+│  ├ Templates
+│  ├ Snippets
+│  ├ Clipboard History
+│  └ Settings
+│
+└ Main Workspace
+├ Source Editor
+└ Preview Area
+├ Preview
+├ HTML
+├ DOCX
+└ PDF
+Use resizable panes.
+Use persistent layouts.
+Feature Requirements
+Smart Paste Engine
+When content is pasted:
+Automatically detect:
+Markdown
+Mermaid
+PlantUML
+Code Blocks
+Tables
+Ascii Diagrams
+Block Quotes
+Callouts
+Lists
+Convert into an internal document model.
+Implement parser abstraction so additional parsers can be added later.
+Markdown Editor
+Implement using TipTap.
+Features:
+Markdown Support
+Syntax Highlighting
+Tables
+Code Blocks
+Task Lists
+Mermaid Blocks
+Callouts
+Search
+Replace
+Auto Save
+Undo
+Redo
+Mermaid Support
+Detect:
+mermaid</span></div><div><span attribution="{&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;timestamp&quot;:1792725600000,&quot;dataSource&quot;:0}">...</span></div><div><span attribution="{&quot;id&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;name&quot;:&quot;Copilot&quot;,&quot;oid&quot;:&quot;E64C3D4F-5E12-4514-AD9B-893A6FAFD00C&quot;,&quot;timestamp&quot;:1792725600000,&quot;dataSource&quot;:0}">
+Render automatically.
+Support:
+Flowchart
+Sequence
+Class
+State
+ERD
+Journey
+Git Graph
+Store source separately from rendered SVG.
+ASCII Diagram Processing
+Detect diagrams like:
++------------+
+| API Layer  |
++------------+
+|
+V
++------------+
+| Queue      |
++------------+
+Provide conversion options:
+Mermaid
+SVG
+Draw.io XML
+Create extensible parser service.
+Live Preview
+Provide:
+Rendered Markdown
+HTML Preview
+DOCX Preview
+PDF Preview
+Refresh automatically.
+No page reload.
+AI Cleanup Features
+Create document transformations:
+Remove AI Preamble
+Examples:
+Certainly!
+Of course!
+Absolutely!
+Hope this helps!
+Remove automatically.
+Normalize Headings
+Convert inconsistent heading structures.
+Convert Writing Style
+Transform content into:
+Solution Design
+HLD
+LLD
+ADR
+RFC
+Runbook
+Operational Guide
+Templates
+Provide built-in templates.
+Solution Design
+Executive Summary
+Requirements
+Architecture
+Dependencies
+Risks
+Assumptions
+HLD
+Context
+Architecture
+Systems
+Integrations
+Deployment
+LLD
+Modules
+Interfaces
+Data Models
+Errors
+Validation
+ADR
+Context
+Decision
+Alternatives
+Consequences
+RFC
+Proposal
+Design
+Impact
+Migration
+Runbook
+Purpose
+Pre-Requisites
+Steps
+Validation
+Rollback
+Export Engine
+Support:
+Markdown
+DOCX
+PDF
+HTML
+Pipeline:
+Editor Source
+→ Pandoc
+→ DOCX
+→ LibreOffice
+→ PDF
+Downloads should be generated asynchronously through job processing.
+Snippet Library
+Support:
+Create
+Update
+Delete
+Search
+Tag
+Favourite
+Archive
+Categories:
+Architecture
+Azure
+AWS
+Terraform
+SQL
+Python
+PowerShell
+Kubernetes
+Clipboard History
+Store:
+Last 100 clipboard items
+Features:
+Search
+Tag
+Pin
+Restore
+Delete
+Database
+Use PostgreSQL.
+All tables use:
+UUID primary keys
+created_at
+updated_at
+deleted_at
+Create entities:
+users
+documents
+document_versions
+templates
+snippets
+clipboard_items
+exports
+jobs
+settings
+Generate Alembic migrations.
+Generate seed data.
+Security
+Implement:
+JWT Authentication
+Role Based Access Control
+Secure Password Hashing
+Rate Limiting
+Input Validation
+Security Headers
+CORS Configuration
+No secrets in source code.
+Environment variables only.
+Observability
+Implement:
+Structured Logging
+Request Logging
+Error Tracking
+Health Endpoints
+Readiness Endpoint
+Liveness Endpoint
+Add:
+/api/health
+/api/ready
+Docker Requirements
+Application must run with:
+docker compose up -d
+Create containers for:
+frontend
+backend
+worker
+postgres
+redis
+minio
+Provide:
+Dockerfiles
+docker compose
+.env.example
+Include startup checks.
+Testing
+Generate:
+Pytest
+API tests
+Playwright tests
+Component tests
+Coverage target:
+80%
+CI/CD
+Create GitHub Actions for:
+lint
+test
+build
+container scan
+docker image publish
+release
+Documentation
+Generate:
+README.md
+docs/architecture.md
+docs/deployment.md
+docs/development.md
+docs/api.md
+docs/roadmap.md
+Include Mermaid diagrams.
+Implementation Strategy
+Implement in phases.
+Phase 1
+Deliver:
+Authentication
+Editor
+Markdown
+Mermaid
+Live Preview
+Export
+Docker
+Application must be runnable.
+Phase 2
+Deliver:
+Templates
+Snippets
+Clipboard History
+Search
+Phase 3
+Deliver:
+AI Cleanup
+ASCII Diagram Conversion
+Advanced Transformations
+Phase 4
+Deliver:
+Observability
+Hardening
+Performance Optimization
+Production Readiness
+Agent Behaviour
+When generating code:
+Create actual files.
+Create actual implementations.
+Do not leave TODO placeholders unless unavoidable.
+Prefer working code over overly abstract designs.
+Keep architecture simple.
+Use clean architecture principles where they add value.
+Keep local Docker development easy.
+Ensure the application works on Ubuntu Linux.
+Ensure all generated code is type-safe.
+After each major phase, update project documentation automatically.
+Generate the complete project incrementally and maintain a task checklist indicating progress and remaining work.
