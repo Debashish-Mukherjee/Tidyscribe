@@ -11,7 +11,7 @@ RUN for cert in /tmp/custom-certs/*.crt /tmp/custom-certs/*.pem /tmp/custom-cert
       [ ! -f "$cert" ] || cat "$cert" >> /etc/ssl/certs/ca-certificates.crt; \
     done
 RUN apt-get update -qq \
-    && apt-get install -y -qq --no-install-recommends fonts-dejavu-core fonts-dejavu-extra fonts-wqy-microhei \
+    && apt-get install -y -qq --no-install-recommends fonts-dejavu-core fonts-dejavu-extra fonts-wqy-microhei libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 \
     && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt constraints.txt ./
 RUN python -m pip install --no-cache-dir --upgrade pip==26.3 \

@@ -28,7 +28,7 @@ export const PREVIEW_CSS = `
 .md-preview .callout-warning, .md-preview .callout-caution { border-left-color: var(--warning); }
 .md-preview .callout-tip { border-left-color: var(--success); }
 .md-preview .callout-note, .md-preview .callout-important { border-left-color: var(--primary); }
-.md-preview pre { background: var(--background); border: 1px solid var(--border); border-radius: 6px; padding: 12px; overflow: auto; font-size: 0.85rem; margin: 1em 0; }
+.md-preview pre { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px; overflow: auto; font-size: 0.85rem; margin: 1em 0; }
 .md-preview code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .md-preview p code, .md-preview li code { background: var(--panel); padding: 2px 6px; border-radius: 4px; }
 .md-preview .mermaid { background: #fff; border-radius: 6px; padding: 12px; margin: 1em 0; overflow: auto; }

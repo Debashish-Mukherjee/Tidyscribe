@@ -6,7 +6,7 @@ Tidyscribe is a self-hosted document productivity application that turns AI-gene
 
 - Frontend: Next.js 16 + TypeScript + Tailwind, markdown source editor (textarea), `marked` + DOMPurify preview, Mermaid
 - Backend: FastAPI + SQLAlchemy with Alembic migrations; Celery + Redis for exports
-- Exports: `markdown-it-py` parser feeding HTML, `python-docx` (DOCX) and `reportlab` (PDF) writers, DejaVu fonts
+- Exports: `markdown-it-py` parser feeding HTML, `python-docx` (DOCX) and PDF writers (ReportLab, with WeasyPrint/Pango for RTL text), DejaVu fonts
 - Persistence: PostgreSQL + local filesystem volumes
 - Deployment: Docker Compose (postgres, redis, backend, export worker, maintenance worker, scheduler, frontend)
 
@@ -53,7 +53,7 @@ Files are persisted under:
 Done:
 
 - [x] Markdown editor with live preview (headings, tables, task lists, code, callouts, Mermaid, ASCII diagrams)
-- [x] HTML, DOCX and PDF export with real structure; diagrams embedded as images; Unicode PDF text with an embedded CJK font (WenQuanYi Micro Hei)
+- [x] HTML, DOCX and PDF export with real structure; diagrams embedded as images; Unicode PDF text with an embedded CJK font (WenQuanYi Micro Hei); shaped Arabic and Hebrew with bidirectional layout
 - [x] Smart paste and AI-preamble cleanup / tone transforms
 - [x] Rich paste: formatted text copied from chat UIs, Google Docs, Word or web pages arrives as Markdown (bullets, headings, bold, links, tables, code); Ctrl+Shift+V pastes plain text
 - [x] Diagram conversion: ASCII to Mermaid/SVG/Draw.io; PlantUML (sequence, class, state, activity, component), Draw.io files, Terraform and Kubernetes to Mermaid

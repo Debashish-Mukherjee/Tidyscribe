@@ -83,7 +83,7 @@ flowchart LR
     MD -- "API clients" --> MI[markdown-it-py + same extensions] --> TREE[document tree, one HTML policy]
     TREE --> H[HTML writer]
     TREE --> D[python-docx writer]
-    TREE --> R[reportlab PDF writer]
+    TREE --> R[PDF writers: ReportLab / WeasyPrint for RTL]
     IMG[Diagram PNGs from browser] --> H
     IMG --> D
     IMG --> R
@@ -163,3 +163,7 @@ Celery Beat dispatches maintenance every 15 seconds to a dedicated queue. A main
 Preview work uses React's deferred value and a bounded cache of diagram render promises. Cached SVG ids are rewritten per insertion so repeated diagrams retain working references. Narrow screens show one workspace pane at a time.
 
 The editor is a plain markdown textarea; the preview is `marked` output sanitised with DOMPurify. Layout, theme and draft are stored in `localStorage`.
+
+### Bidirectional PDF layout
+
+The default PDF pipeline detects RTL characters across the parsed document, including code and text embedded in otherwise English paragraphs. Those documents use WeasyPrint/Pango/HarfBuzz from `services/rtl_pdf.py`. Generated HTML receives print styles for A4 pagination, right alignment of RTL blocks and cells, and Unicode math. A strict URL fetcher only permits the writer's embedded PNG diagrams. Other documents continue through ReportLab, retaining its existing layout and performance characteristics. Native Pango and HarfBuzz packages are installed by the standard backend Dockerfile.

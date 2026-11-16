@@ -806,9 +806,10 @@ def _has_embedded_cjk() -> bool:
     return CJK_FONT in pdfmetrics.getRegisteredFontNames()
 
 
-def _pdf_text(value: str) -> str:
+def _pdf_text(value: str, *, preserve_joiners: bool = False) -> str:
     """Remove characters the PDF fonts cannot draw (they would show as empty boxes or corrupt text extraction)."""
-    value = value.translate(_INVISIBLE).translate(_SYMBOL_FALLBACKS)
+    invisible = _INVISIBLE if not preserve_joiners else {key: val for key, val in _INVISIBLE.items() if key not in (0x200C, 0x200D)}
+    value = value.translate(invisible).translate(_SYMBOL_FALLBACKS)
     # reportlab embeds TrueType fonts through 16-bit codes, so anything above U+FFFF (emoji) breaks the text map.
     value = _ASTRAL.sub("", value)
     return _EMOJI.sub(lambda match: match.group(0) if _dejavu_has(match.group(0)) else "", value)
@@ -838,6 +839,21 @@ def _display_columns(text: str) -> int:
 
 
 def render_pdf(title: str, markdown: str, diagrams: dict[str, Diagram], html_source: str | None = None) -> bytes:
+    from app.services.rtl_pdf import contains_rtl, render_rtl_pdf
+
+    tree = parse_document(markdown, html_source)
+    def has_rtl(node: Node) -> bool:
+        summary = node.meta.get("summary")
+        return (
+            contains_rtl(node.content)
+            or contains_rtl(str(node.meta.get("caption", "")))
+            or (isinstance(summary, Node) and contains_rtl(_text(summary)))
+        )
+
+    if contains_rtl(title) or any(has_rtl(node) for node in tree.walk()):
+        _pdf_fonts()
+        return render_rtl_pdf(render_html(title, markdown, diagrams, html_source), lambda text: _pdf_text(text, preserve_joiners=True))
+
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle
@@ -1154,7 +1170,7 @@ def render_pdf(title: str, markdown: str, diagrams: dict[str, Diagram], html_sou
         buffer, pagesize=A4, leftMargin=margin, rightMargin=margin, topMargin=margin, bottomMargin=margin,
         title=latin(title), author="Tidyscribe",
     )
-    story = blocks(parse_document(markdown, html_source).children, page_width) or [Paragraph(" ", body)]
+    story = blocks(tree.children, page_width) or [Paragraph(" ", body)]
     template.build(story, onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()
 

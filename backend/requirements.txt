@@ -21,3 +21,4 @@ reportlab==4.2.5
 prometheus-client==0.21.0
 sentry-sdk==2.18.0
 PyYAML==6.0.3
+weasyprint==70.0

@@ -29,6 +29,7 @@ Status against the original specification. Items are grouped by theme; nothing h
 - Portable default builds, optional corporate certificate roots, loopback-only published ports and dependency-aware readiness.
 - Generated API schema types, document-session/export hooks, deferred preview work and bounded diagram caching.
 - Keyboard export menu and preview tabs, named preview content, narrow-screen Editor/Preview switching and document pagination.
+- Shaped RTL PDF output, right-aligned RTL blocks and cells, and distinct light-mode code-block backgrounds.
 - Shared conversion corpus and backup/restore scripts. See [validation.md](validation.md).
 
 ## Next

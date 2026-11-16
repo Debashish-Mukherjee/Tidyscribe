@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { docxHasImages, docxText, editor, editorValue, open, paste, pdfText, preview, setContent, squash } from "../support/app";
 
@@ -289,4 +290,18 @@ test.describe("directionality", () => {
     const html = (await exportFile(page, /^HTML$/)).toString("utf8");
     expect(html.match(/<p dir="auto">/g)).toHaveLength(2);
   });
+});
+
+
+test("RTL PDF keeps logical text, Unicode math and the browser-rendered diagram", async ({ page }) => {
+  await open(page);
+  await setContent(page, "# Mixed report\n\nمرحبا بالعالم\n\nשלום עולם\n\nEquation: $x^2$.\n\n```mermaid\nflowchart LR\n A[API] --> B[Worker]\n```");
+  await expect(page.locator(".md-preview .mermaid svg")).toBeVisible();
+  const bytes = await exportFile(page, /^PDF$/);
+  const text = pdfText(bytes);
+  expect(text).toContain("مرحبا");
+  expect(text).toContain("שלום");
+  expect(text).toContain("x²");
+  const images = execFileSync("pdfimages", ["-list", "-"], { input: bytes }).toString("utf8");
+  expect(images).toMatch(/\bimage\b/);
 });

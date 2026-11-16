@@ -73,7 +73,7 @@ Browser suites must run against a dedicated Compose project with disposable data
 
 `backend/requirements.txt` contains runtime dependencies. `requirements-test.txt` adds HTTP test clients, pytest, coverage and PDF inspection. `pytest-asyncio`, authentication libraries and multipart parsing are not installed because the code does not use them. Docker's default `production` target copies application code and migrations only; its `test` target adds test dependencies, tests, benchmarks and scripts. The test Compose override mounts the shared fixtures.
 
-Use Python 3.12 for backend development, matching the container. Frontend validation uses Node.js 24. Clean frontend installs use `npm ci` with normal peer dependency checks.
+Use Python 3.12 for backend development, matching the container. Local RTL PDF rendering also needs `libpango-1.0-0`, `libpangoft2-1.0-0` and `libharfbuzz-subset0` (included in the backend image). Frontend validation uses Node.js 24. Clean frontend installs use `npm ci` with normal peer dependency checks.
 
 ```bash
 cd frontend

@@ -7,6 +7,6 @@
   "international.md": {
     "text": ["International Notes", "Reliable documents", "Definition"],
     "html": ["中文", "العربية", "עברית"],
-    "knownLosses": ["The built-in PDF writer drops unsupported emoji and does not shape or reorder RTL text.", "CJK PDF output depends on the installed font."]
+    "knownLosses": ["The PDF writers drop unsupported emoji; color emoji are not supported.", "CJK PDF output depends on the installed font."]
   }
 }
