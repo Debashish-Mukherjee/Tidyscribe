@@ -185,3 +185,31 @@ def test_update_with_a_stale_timestamp_is_rejected_and_keeps_the_newer_content()
 def test_update_without_a_timestamp_still_overwrites() -> None:
     created = client.post("/api/documents", json={"title": "Plain", "content": "a"}).json()
     assert client.put(f"/api/documents/{created['id']}", json={"content": "b"}).status_code == 200
+
+
+def test_simultaneous_saves_with_the_same_revision_only_allow_one_writer() -> None:
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    created = client.post("/api/documents", json={"title": "Concurrent", "content": "original"}).json()
+    barrier = Barrier(2)
+
+    def save(text):
+        barrier.wait(timeout=5)
+        isolated = TestClient(app)
+        return isolated.put(f"/api/documents/{created['id']}", json={"content": text, "expected_updated_at": created["updated_at"]})
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(save, ["writer A", "writer B"]))
+    assert sorted(result.status_code for result in results) == [200, 409]
+    versions = client.get(f"/api/documents/{created['id']}/versions").json()
+    assert [version["content"] for version in versions] == ["original"]
+
+
+def test_restore_with_a_stale_revision_preserves_newer_work() -> None:
+    created = client.post("/api/documents", json={"title": "Restore conflict", "content": "old"}).json()
+    client.put(f"/api/documents/{created['id']}", json={"content": "new"})
+    version = client.get(f"/api/documents/{created['id']}/versions").json()[0]
+    response = client.post(f"/api/documents/{created['id']}/versions/{version['id']}/restore", json={"expected_updated_at": created["updated_at"]})
+    assert response.status_code == 409
+    assert client.get(f"/api/documents/{created['id']}").json()["content"] == "new"

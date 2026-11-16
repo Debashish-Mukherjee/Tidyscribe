@@ -8,3 +8,10 @@ test-results/
 *.tsbuildinfo
 .env
 *:sec.endpointdlp
+
+coverage/
+.coverage
+certificates/*
+!certificates/README.md
+frontend/tests/support/.uat-state.json
+backups/

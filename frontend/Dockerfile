@@ -1,9 +1,13 @@
 FROM node:24-alpine AS base
 WORKDIR /app
-ENV NODE_EXTRA_CA_CERTS=/tmp/Zscalar_root_CA.crt \
-    npm_config_cafile=/tmp/Zscalar_root_CA.crt \
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/cert.pem \
+    npm_config_cafile=/etc/ssl/cert.pem \
     NEXT_TELEMETRY_DISABLED=1
-COPY --from=certs Zscalar_root_CA.cer /tmp/Zscalar_root_CA.crt
+# Optional corporate roots; the default context contains only a README.
+COPY --from=certs . /tmp/custom-certs/
+RUN for cert in /tmp/custom-certs/*.crt /tmp/custom-certs/*.pem /tmp/custom-certs/*.cer; do \
+      [ ! -f "$cert" ] || cat "$cert" >> /etc/ssl/cert.pem; \
+    done
 
 FROM base AS deps
 COPY package.json package-lock.json ./

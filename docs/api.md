@@ -99,11 +99,12 @@ POST /api/exports
 
 Send exactly one of `document_id` or `content` (`422` otherwise). `html` (optional, with `content`) is the HTML the Preview showed; the exports follow it. Exporting `content` does not create a document; the web UI always uses it, so viewing or exporting never saves anything. Downloads of such jobs are named `document.<ext>`.
 
-`202 Accepted` with `{job_id, status, type, file_url, error}`. `status` moves `queued` to `processing` to `completed` or `failed`; `file_url` is set once completed and `error` is a short message when failed (details are in the server logs, not in the response).
+`202 Accepted` with `{job_id, status, type, file_url, error}`. `status` moves `queued` → `starting` → `processing` → `completed`, `failed`, `cancelled` or `timed_out`; `file_url` is set once completed and `error` is a short message when failed (details are in the server logs, not in the response).
 
 | Method | Path | Notes |
 | --- | --- | --- |
 | GET | `/api/exports/{job_id}` | Job status for polling (the web UI polls every 400 ms). `404` if unknown. |
+| POST | `/api/exports/{job_id}/cancel` | Cancel queued or active work; returns the job. Finished jobs remain unchanged. |
 | GET | `/api/exports/{job_id}/download` | The file, with the right `Content-Type` and a `Content-Disposition` filename derived from the document title. `409` while the job is not completed, `404` if unknown. |
 | GET | `/api/jobs` | All jobs. |
 
@@ -112,3 +113,7 @@ Errors: `400` for an unknown or deleted document or an invalid diagram upload (r
 `diagrams` is optional. Mermaid cannot be rendered server-side without a headless browser, so the web UI renders each diagram and uploads it as a PNG keyed by its Mermaid source. Diagrams without an image are exported as source code with a note. Uploads are validated (valid base64, PNG signature, 5 MB each, at most 50) and handed to the worker through the shared `exports` volume, then deleted.
 
 Export content: headings, paragraphs, lists, task lists, tables, blockquotes and GitHub-style callouts (`> [!WARNING]`), code blocks, ASCII diagrams (rendered monospaced), links and images-as-diagrams. PDFs are A4 and embed DejaVu fonts (Latin, Greek, Cyrillic, symbols, arrows, box drawing) plus WenQuanYi Micro Hei for Chinese, Japanese and Korean, in paragraphs, tables and code blocks (regular weight only, so bold/italic CJK is not synthesised). Task items render as checkboxes, `✅`/`❌` become `✔`/`✘`, and emoji and zero-width characters are dropped because the PDF fonts have no colour glyphs. Callouts, quotes and table cells taller than a page continue on the next page, and long tables repeat their header row.
+
+Document updates and version restores accept an optional `expected_updated_at` revision. A stale revision returns `409` before changing content. Omitting it preserves the explicit overwrite behavior for existing API clients. Mutations serialize on the document row.
+
+Completed export files expire after the configured retention period; their job metadata remains, `file_url` becomes null and downloads return `404`. Cleanup runs independently every 15 seconds.

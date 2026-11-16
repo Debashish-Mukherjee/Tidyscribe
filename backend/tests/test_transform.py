@@ -23,3 +23,11 @@ def test_transform_keeps_heading_levels_lists_tables_and_code_blocks() -> None:
     response = client.post("/api/transform", json={"text": text, "tone": "Solution Design"})
     assert response.status_code == 200
     assert response.json()["cleaned_text"] == text.strip()
+
+
+def test_style_changes_headings_without_rewriting_prose_or_nested_fences() -> None:
+    from app.services.transform_service import convert_writing_style
+
+    text = '# Overview\n\nOverview of the Summary API.\n\n````markdown\n```\n# Overview\n```\n````\n\n## Summary'
+    expected = text.replace('# Overview\n\n', '# Context\n\n', 1).replace('## Summary', '## Architecture')
+    assert convert_writing_style(text, 'HLD') == expected

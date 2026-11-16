@@ -9,10 +9,11 @@ from __future__ import annotations
 import ctypes
 import logging
 import os
+import re
 import socket
 import threading
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
@@ -20,6 +21,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import SessionLocal
 from app.models import ExportJob
+from app.storage import storage
 
 logger = logging.getLogger("app.export.jobs")
 
@@ -237,3 +239,46 @@ def reap_if_stale(db: Session, job_id: str) -> None:
         .values(status=FAILED, finished_at=func.now(), failure_reason="stale_heartbeat", error=message_for("stale_heartbeat"))
     )
     db.commit()
+
+
+def cleanup_files(db: Session) -> int:
+    """Expire generated files while retaining job metadata and protecting active exports.
+
+    Only UUID-named export artifacts belong to this lifecycle. Failed unlinks are retried
+    on the next maintenance pass; a download URL is cleared only after its file is gone.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=settings.export_retention_hours)
+    directory = storage.base_dir / "exports"
+    if not directory.exists():
+        return 0
+    removed = 0
+    artifact = re.compile(r"^([0-9a-f-]{36})\.(?:md|html|docx|pdf|input\.json|source\.json)(?:\.\d+\.part)?$")
+    jobs = {}
+    for path in directory.iterdir():
+        match = artifact.fullmatch(path.name)
+        if not match or path.is_dir():
+            continue
+        job_id = match[1]
+        if job_id not in jobs:
+            jobs[job_id] = db.get(ExportJob, job_id)
+        job = jobs[job_id]
+        if job is not None:
+            if job.status not in TERMINAL or job.finished_at is None:
+                continue
+            finished = job.finished_at.replace(tzinfo=timezone.utc) if job.finished_at.tzinfo is None else job.finished_at
+            if finished >= cutoff:
+                continue
+        try:
+            if job is None and path.lstat().st_mtime >= cutoff.timestamp():
+                continue
+            path.unlink(missing_ok=True)
+            removed += 1
+        except OSError:
+            logger.warning("could not remove expired export", extra={"job_id": job_id}, exc_info=True)
+    for job in jobs.values():
+        if job is not None and job.file_url and job.status in TERMINAL and job.finished_at is not None:
+            finished = job.finished_at.replace(tzinfo=timezone.utc) if job.finished_at.tzinfo is None else job.finished_at
+            if finished < cutoff and not any(directory.glob(f"{job.id}.[a-z]*")):
+                job.file_url = None
+    db.commit()
+    return removed

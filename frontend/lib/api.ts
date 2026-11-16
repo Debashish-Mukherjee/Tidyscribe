@@ -1,3 +1,4 @@
+import type { ApiSchemas } from "./api-schema";
 import { resolveApiBase } from "./config";
 
 export const apiBase = resolveApiBase();
@@ -11,18 +12,18 @@ export class ApiError extends Error {
   }
 }
 
-export type DocumentOut = { id: string; title: string; content: string; updated_at?: string | null };
-export type DocumentVersion = { id: string; document_id: string; content: string; created_at?: string | null };
-export type TemplateOut = { id: string; name: string; category: string; body: string };
-export type SnippetOut = { id: string; title: string; body: string; category: string; tags: string[]; favorite: boolean; archived: boolean };
-export type ClipboardOut = { id: string; content: string; source?: string | null; tags: string[]; pinned: boolean; created_at?: string | null };
-export type DiagramTarget = "mermaid" | "svg" | "drawio";
-export type ConvertedDiagram = { content: string; target: DiagramTarget; media_type: string; extension: string; warnings?: string[] };
-export type ExportStatus = "queued" | "processing" | "completed" | "failed";
-export type ExportJob = { job_id: string; status: ExportStatus; type: string; file_url: string | null; error: string | null };
-export type ExportDiagram = { source: string; png_base64: string };
-export type TransformChange = { rule: string; label: string; count: number; examples: string[] };
-export type TransformResult = { cleaned_text: string; summary: string; changes: TransformChange[]; removed: number; changed: boolean };
+export type DocumentOut = ApiSchemas["DocumentOut"];
+export type DocumentVersion = ApiSchemas["DocumentVersionOut"];
+export type TemplateOut = ApiSchemas["TemplateOut"];
+export type SnippetOut = Required<ApiSchemas["SnippetOut"]>;
+export type ClipboardOut = Required<ApiSchemas["ClipboardItemOut"]>;
+export type DiagramTarget = NonNullable<ApiSchemas["ConvertDiagramRequest"]["target"]>;
+export type ConvertedDiagram = ApiSchemas["ConvertDiagramResponse"];
+export type ExportJob = ApiSchemas["ExportJobOut"];
+export type ExportStatus = ExportJob["status"];
+export type ExportDiagram = ApiSchemas["DiagramImage"];
+export type TransformChange = Required<ApiSchemas["ChangeOut"]>;
+export type TransformResult = Omit<Required<ApiSchemas["TransformResponse"]>, "changes"> & { changes: TransformChange[] };
 
 type Params = Record<string, string | number | boolean | undefined | null>;
 
@@ -73,7 +74,7 @@ export const api = {
     update: (id: string, json: { title?: string; content?: string; expected_updated_at?: string | null }) => request<DocumentOut>(`/api/documents/${id}`, { method: "PUT", json }),
     remove: (id: string) => request<void>(`/api/documents/${id}`, { method: "DELETE" }),
     versions: (id: string) => request<DocumentVersion[]>(`/api/documents/${id}/versions`),
-    restore: (id: string, versionId: string) => request<DocumentOut>(`/api/documents/${id}/versions/${versionId}/restore`, { method: "POST" }),
+    restore: (id: string, versionId: string, expected_updated_at?: string | null) => request<DocumentOut>(`/api/documents/${id}/versions/${versionId}/restore`, { method: "POST", json: { expected_updated_at } }),
   },
   templates: {
     list: () => request<TemplateOut[]>("/api/templates"),
@@ -95,14 +96,15 @@ export const api = {
     restore: (id: string) => request<ClipboardOut>(`/api/clipboard/${id}/restore`, { method: "POST" }),
   },
   exports: {
-    create: (json: { format: string; diagrams: ExportDiagram[]; document_id?: string; title?: string; content?: string; html?: string }) => request<ExportJob>("/api/exports", { method: "POST", json }),
+    create: (json: ApiSchemas["ExportRequest"]) => request<ExportJob>("/api/exports", { method: "POST", json }),
     get: (jobId: string) => request<ExportJob>(`/api/exports/${jobId}`),
+    cancel: (jobId: string) => request<ExportJob>(`/api/exports/${jobId}/cancel`, { method: "POST" }),
   },
   settings: {
     list: () => request<Record<string, string>>("/api/settings"),
     put: (key: string, value: string) => request<{ value: string }>(`/api/settings/${encodeURIComponent(key)}`, { method: "PUT", json: { value } }),
   },
-  convertDiagram: (source: string, target: DiagramTarget, source_format: "auto" | "ascii" | "plantuml" = "auto") =>
+  convertDiagram: (source: string, target: DiagramTarget, source_format: NonNullable<ApiSchemas["ConvertDiagramRequest"]["source_format"]> = "auto") =>
     request<ConvertedDiagram>("/api/convert-diagram", { method: "POST", json: { source, target, source_format } }),
   expandDiagrams: (markdown: string) =>
     request<{ markdown: string; converted: number; unsupported: number }>("/api/expand-diagrams", { method: "POST", json: { markdown } }),
@@ -131,7 +133,10 @@ export async function waitForExport(job: ExportJob, { intervalMs = 400, timeoutM
       onStatus?.(current.status);
     }
     if (current.status === "completed") return current;
-    if (current.status === "failed") throw new Error(current.error || "The export failed");
+    if (current.status === "failed" || current.status === "cancelled" || current.status === "timed_out") {
+      const fallback = { failed: "The export failed", cancelled: "The export was cancelled", timed_out: "The export timed out" };
+      throw new Error(current.error || fallback[current.status]);
+    }
     if (Date.now() >= deadline) throw new Error("The export is taking too long; try again in a moment");
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
     current = await api.exports.get(job.job_id);

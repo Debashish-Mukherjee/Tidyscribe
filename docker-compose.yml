@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,7 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
 
@@ -26,21 +26,30 @@ services:
     build:
       context: ./backend
       additional_contexts:
-        certs: /home/debashish
-    environment:
+        certs: ./certificates
+    environment: &app-environment
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/docworkbench
       REDIS_URL: redis://redis:6379/0
-      CORS_ORIGINS: http://localhost:3000
-      SECRET_KEY: change-me
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      SECRET_KEY: ${SECRET_KEY:-change-me}
       SENTRY_DSN: ${SENTRY_DSN:-}
-      SSL_CERT_FILE: /tmp/Zscalar_root_CA.crt
+      API_BASE_URL: ${API_BASE_URL:-http://localhost:8000}
+      EXPORT_RETENTION_HOURS: ${EXPORT_RETENTION_HOURS:-168}
+      EXPORT_SOFT_TIMEOUT_SECONDS: ${EXPORT_SOFT_TIMEOUT_SECONDS:-90}
+      EXPORT_HARD_TIMEOUT_SECONDS: ${EXPORT_HARD_TIMEOUT_SECONDS:-120}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes:
       - uploads_data:/app/data/uploads
       - exports_data:/app/data/exports
@@ -48,24 +57,27 @@ services:
       - diagrams_data:/app/data/diagrams
       - templates_data:/app/data/templates
       - generated_data:/app/data/generated
+      - ./test-fixtures:/fixtures:ro
 
-  worker:
+  worker: &export-worker
     build:
       context: ./backend
       args:
-        INSTALL_DOC_TOOLS: ${INSTALL_DOC_TOOLS:-true}
+        INSTALL_DOC_TOOLS: ${INSTALL_DOC_TOOLS:-false}
       additional_contexts:
-        certs: /home/debashish
-    command: celery -A app.tasks worker --loglevel=info
+        certs: ./certificates
+    command: celery -A app.tasks worker --loglevel=info --concurrency=2 -Q celery
     environment:
+      <<: *app-environment
       EXPORT_ENGINE: ${EXPORT_ENGINE:-python}
       SENTRY_DSN: ${SENTRY_DSN:-}
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/docworkbench
       REDIS_URL: redis://redis:6379/0
-      SSL_CERT_FILE: /tmp/Zscalar_root_CA.crt
     depends_on:
-      - backend
-      - redis
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_started
     volumes:
       - uploads_data:/app/data/uploads
       - exports_data:/app/data/exports
@@ -73,6 +85,20 @@ services:
       - diagrams_data:/app/data/diagrams
       - templates_data:/app/data/templates
       - generated_data:/app/data/generated
+      - ./test-fixtures:/fixtures:ro
+
+  maintenance:
+    <<: *export-worker
+    command: celery -A app.tasks worker --loglevel=info --concurrency=1 -Q maintenance
+    environment:
+      <<: *app-environment
+      WORKER_ROLE: maintenance
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/docworkbench
+      REDIS_URL: redis://redis:6379/0
+
+  scheduler:
+    <<: *export-worker
+    command: celery -A app.tasks beat --loglevel=info --schedule=/tmp/celerybeat-schedule
 
   frontend:
     build:
@@ -82,14 +108,15 @@ services:
         # Inlined into the browser bundle at build time; rebuild the image to change it.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
       additional_contexts:
-        certs: /home/debashish
+        certs: ./certificates
     environment:
       # Read at container start; must be the URL the browser uses to reach the API.
       API_URL: ${API_URL:-http://localhost:8000}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
-      - "3000:3000"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
 
 volumes:
   postgres_data:

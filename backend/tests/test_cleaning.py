@@ -95,7 +95,8 @@ def test_clean_text_reports_nothing() -> None:
 def test_style_vocabulary_is_reported_not_silent() -> None:
     result = transform_document("# Overview\n\nSummary of things.\n\n```\nOverview\n```", "HLD")
     rules = {change["rule"]: change for change in result["changes"]}
-    assert rules["style"]["count"] == 2 and "Overview -> Context" in rules["style"]["examples"]
+    assert rules["style"]["count"] == 1 and "Overview -> Context" in rules["style"]["examples"]
+    assert "Summary of things." in result["cleaned_text"]
     assert "```\nOverview\n```" in result["cleaned_text"]
     assert result["changed"] is True
 

@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.api import clipboard, diagrams, documents, exports, snippets, templates
 from app.api import settings as settings_api
@@ -81,12 +82,21 @@ def health() -> HealthResponse | JSONResponse:
         logger.warning("health check cannot reach the database", exc_info=True)
         return JSONResponse(status_code=503, content={**base, "status": "unavailable", "database": "down"})
     # Queued work with no worker alive, or jobs past their heartbeat, are visible here before users notice.
-    degraded = queue["stale"] > 0 or (queue["states"]["queued"] > 0 and queue["redis"] and queue["workers"] == 0)
+    degraded = not queue["redis"] or queue["stale"] > 0 or (queue["states"]["queued"] > 0 and queue["workers"] == 0)
     return HealthResponse(status="degraded" if degraded else "ok", database="ok", queue=queue, **base)
 
 
-@app.get("/api/ready")
-def ready() -> dict[str, str]:
+@app.get("/api/ready", response_model=None)
+def ready() -> dict | JSONResponse:
+    """Ready to accept document and export requests, including their dependencies."""
+    try:
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+    except Exception:
+        return JSONResponse(status_code=503, content={"status": "unavailable", "database": "down"})
+    queue = queue_stats.redis_stats()
+    if not queue["redis"] or not queue["workers"] or not queue["maintenance_workers"]:
+        return JSONResponse(status_code=503, content={"status": "unavailable", "database": "ok", "queue": queue})
     return {"status": "ready", "service": settings.app_name}
 
 

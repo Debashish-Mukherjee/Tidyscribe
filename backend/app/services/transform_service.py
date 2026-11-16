@@ -25,12 +25,17 @@ def _apply_style(text: str, tone: str) -> tuple[str, Change | None]:
     if not words:
         return text, None
     change = Change("style", f"Applied the {tone} vocabulary")
-    in_fence = False
+    fence: tuple[str, int] | None = None
     lines: list[str] = []
     for line in text.split("\n"):
-        if _FENCE.match(line):
-            in_fence = not in_fence
-        elif not in_fence:
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        if marker:
+            run, tail = marker.groups()
+            if fence is None:
+                fence = (run[0], len(run))
+            elif run[0] == fence[0] and len(run) >= fence[1] and not tail.strip():
+                fence = None
+        elif fence is None and re.match(r"^ {0,3}#{1,6}\s+", line):
             for old, new in words.items():
                 line, count = re.subn(rf"\b{old}\b", new, line)
                 for _ in range(count):

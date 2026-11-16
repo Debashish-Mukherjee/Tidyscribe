@@ -295,3 +295,55 @@ def test_browser_timings_are_accepted_and_unknown_names_ignored() -> None:
     body = client.get("/api/metrics").text
     assert 'client_duration_ms_count{name="preview_render"}' in body and "evil-" not in body
     assert client.post("/api/metrics/client", json={"samples": [{"name": "preview_render", "ms": -1}]}).status_code == 422
+
+
+def test_recovery_after_an_export_process_is_actually_killed(monkeypatch) -> None:
+    import multiprocessing
+    from app.database import engine
+
+    context = multiprocessing.get_context("fork")
+    building = context.Event()
+    job_id = _queue_text()
+
+    def child():
+        # A forked worker must create its own database connections.
+        engine.dispose(close=False)
+        def hang(*_args, **_kwargs):
+            building.set()
+            while True:
+                time.sleep(0.02)
+        with patch("app.tasks.build_export", side_effect=hang):
+            run_export(job_id)
+
+    process = context.Process(target=child)
+    process.start()
+    try:
+        assert building.wait(10)
+        assert _read(job_id).status == "processing"
+        process.kill()
+        process.join(timeout=5)
+        assert process.exitcode == -9
+        # Let a real heartbeat expire; recovery does not depend on a client polling.
+        monkeypatch.setattr(settings, "export_heartbeat_stale_seconds", 0.2)
+        time.sleep(0.3)
+        with SessionLocal() as db:
+            export_jobs.recover_jobs(db)
+        assert (_read(job_id).status, _read(job_id).failure_reason) == ("failed", "stale_heartbeat")
+        next_job = _queue_text("# The next job still works")
+        run_export(next_job)
+        assert _read(next_job).status == "completed"
+    finally:
+        if process.is_alive():
+            process.kill()
+        process.join(timeout=5)
+
+
+def test_retention_preserves_active_and_recent_artifacts() -> None:
+    active = _job("processing", started_at=1, heartbeat_at=1)
+    recent = _queue_text()
+    run_export(recent)
+    storage.save_file(output_path(active, "pdf"), b"active")
+    with SessionLocal() as db:
+        export_jobs.cleanup_files(db)
+    assert storage.file_exists(output_path(active, "pdf"))
+    assert storage.file_exists(output_path(recent, "html"))

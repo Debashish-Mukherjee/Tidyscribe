@@ -120,6 +120,13 @@ describe("waitForExport", () => {
     await expect(waitForExport(job("failed"))).rejects.toThrow("The export failed");
   });
 
+  it.each(["cancelled", "timed_out"] as const)("stops polling immediately for %s", async (status) => {
+    const fetchMock = respond(200, job(status, { error: "Stopped by worker" }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(waitForExport(job("starting"), { intervalMs: 1 })).rejects.toThrow("Stopped by worker");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("gives up after the timeout", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => job("processing") }));
     await expect(waitForExport(job("queued"), { intervalMs: 5, timeoutMs: 30 })).rejects.toThrow(/taking too long/);

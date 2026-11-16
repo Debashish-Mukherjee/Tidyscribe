@@ -47,7 +47,7 @@ A test fails if the models and the migrations disagree. Downgrade with `alembic 
 
 ## Exports run in the background
 
-`POST /api/exports` queues a job and returns `202`; the web UI polls `GET /api/exports/{job_id}` until it is `completed` or `failed`. If Redis or the worker is down, `POST` returns `503` and the job is marked failed. A job that sits in `queued` means the worker is not running: check `docker compose logs worker`. See [api.md](api.md#exports).
+`POST /api/exports` queues a job and returns `202`; the web UI polls `GET /api/exports/{job_id}` until it is `completed`, `failed`, `cancelled` or `timed_out`. If Redis rejects publication, `POST` returns `503` and the job is marked failed. If no worker is available, publication can still succeed and the job remains queued until recovery or expiry. A job that sits in `queued` means the worker is not running: check `docker compose logs worker`. See [api.md](api.md#exports).
 
 ## Configuration
 
@@ -107,13 +107,40 @@ Set `SENTRY_DSN` to report unhandled API exceptions and failed export jobs.
 
 `GET /api/health` (liveness) and `GET /api/ready` (readiness). Postgres has a Compose health check and the backend waits for it.
 
+## Portable builds and network access
+
+No personal directory or corporate certificate is required. Optional PEM roots can be placed in `certificates/` before building; see its README. `INSTALL_DOC_TOOLS` defaults to `false` so the standard worker uses the built-in writers.
+
+Published ports bind to `127.0.0.1`. Set `FRONTEND_PORT`, `BACKEND_PORT`, `POSTGRES_PORT`, and `REDIS_PORT` to avoid collisions. Use a reverse proxy for remote access, and configure browser `API_URL`, build fallback `NEXT_PUBLIC_API_URL`, backend `API_BASE_URL`, and `CORS_ORIGINS` consistently. Database and Redis credentials in this Compose file remain development defaults.
+
+## Export lifecycle
+
+Compose starts an export worker (two processes consuming `celery`), a maintenance worker (one process consuming `maintenance`) and one Beat scheduler. Run only one scheduler per installation. Maintenance runs every 15 seconds; old generated files expire after `EXPORT_RETENTION_HOURS` (default 168). Job metadata remains available and download URLs are cleared after expiry.
+
+`EXPORT_SOFT_TIMEOUT_SECONDS` defaults to 90 and `EXPORT_HARD_TIMEOUT_SECONDS` to 120. Cancelling is available through `POST /api/exports/{id}/cancel` and the browser's Cancel export button. Failed and cancelled exports are not automatically retried; orphaned queued work is re-dispatched before its expiry.
+
+Liveness (`/api/health`) returns 503 for database failure and reports `degraded` when the broker is down or jobs are stale. Readiness (`/api/ready`) returns 503 unless the database, broker, export worker and maintenance worker are available. Workers wait for backend startup and migrations before consuming tasks.
+
 ## Backups
 
-Back up the `postgres_data` volume (`pg_dump` from the container) and the `exports_data` volume. Exports can be regenerated from documents, so only the database is essential.
+Use a new backup directory:
 
 ```bash
-docker compose exec postgres pg_dump -U postgres docworkbench > backup.sql
+scripts/backup.sh backups/2026-11-16
 ```
+
+The script creates a PostgreSQL custom-format dump and an archive of generated exports. Stop writers first when taking a consistent point-in-time backup under load. Browser-only drafts are local to each browser and are not included.
+
+Restore into a fresh Compose project with an empty database:
+
+```bash
+COMPOSE_PROJECT_NAME=tidyscribe-restored docker compose up -d postgres redis
+COMPOSE_PROJECT_NAME=tidyscribe-restored docker compose build backend
+COMPOSE_PROJECT_NAME=tidyscribe-restored scripts/restore.sh backups/2026-11-16
+COMPOSE_PROJECT_NAME=tidyscribe-restored docker compose up -d --build
+```
+
+Stop the original project first, or configure different published ports. The restore script refuses to overwrite a database that already has public tables. It does not remove an existing installation.
 
 ## Not yet production-ready
 

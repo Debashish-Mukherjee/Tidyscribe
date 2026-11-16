@@ -1,0 +1,12 @@
+{
+  "technical-report.md": {
+    "text": ["Order Platform", "Architecture", "Gateway", "Worker", "Operations", "Service ownership"],
+    "html": ["<table", "<details", "<pre", "<sup"],
+    "knownLosses": ["Mermaid is source text without an uploaded PNG or the optional rendering CLI.", "DOCX and PDF use readable Unicode math rather than typeset equations."]
+  },
+  "international.md": {
+    "text": ["International Notes", "Reliable documents", "Definition"],
+    "html": ["中文", "العربية", "עברית"],
+    "knownLosses": ["The built-in PDF writer drops unsupported emoji and does not shape or reorder RTL text.", "CJK PDF output depends on the installed font."]
+  }
+}

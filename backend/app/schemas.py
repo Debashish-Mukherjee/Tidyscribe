@@ -34,6 +34,10 @@ class DocumentOut(BaseModel):
     updated_at: datetime | None = None
 
 
+class DocumentRestore(BaseModel):
+    expected_updated_at: datetime | None = None
+
+
 class DocumentVersionOut(BaseModel):
     id: str
     document_id: str
