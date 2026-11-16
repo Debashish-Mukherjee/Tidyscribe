@@ -66,4 +66,4 @@ The complete backend suite passed 271 tests (3 optional CLI tests skipped), reta
 
 The expanded browser regression suite now passes all 93 cases, including the three previously failing assertions. Light-mode code blocks use the existing panel background color. The package audit script continues to report zero known npm or Python package vulnerabilities with the new rendering dependencies.
 
-GitHub alert reconciliation remains pending alert-read access or an exported alert list. The connector cannot access the alert endpoint, and no independent API token is available; no GitHub alerts were dismissed. See [dependency-maintenance.md](dependency-maintenance.md).
+GitHub alert reconciliation was completed on 16 November 2026 at approximately 07:33 UTC. An authenticated request to the repository’s Dependabot endpoint returned HTTP 200 and zero open alerts, agreeing with the local package audit results. No alerts were dismissed or suppressed by this work. See [dependency-maintenance.md](dependency-maintenance.md) for the scope of this check.
