@@ -156,4 +156,10 @@ frontend/
   lib/richpaste.ts               clipboard HTML to Markdown (Turndown + GFM) on paste
 ```
 
+Document-session state lives in `frontend/hooks/use-document-session.ts`; export orchestration and object-URL ownership live in `frontend/hooks/use-exports.ts`. API schema types in `frontend/lib/api-schema.ts` are generated from FastAPI's OpenAPI contract. Drafts use one browser-storage key per tab and retain the document id, last saved content and server revision. Old draft formats remain readable.
+
+Celery Beat dispatches maintenance every 15 seconds to a dedicated queue. A maintenance worker handles stale jobs, orphan re-dispatch and export-file expiry independently of document conversions. Job metadata remains in PostgreSQL after files expire. Concurrent document mutations lock the document row before comparing its revision; version restoration can also carry `expected_updated_at`.
+
+Preview work uses React's deferred value and a bounded cache of diagram render promises. Cached SVG ids are rewritten per insertion so repeated diagrams retain working references. Narrow screens show one workspace pane at a time.
+
 The editor is a plain markdown textarea; the preview is `marked` output sanitised with DOMPurify. Layout, theme and draft are stored in `localStorage`.

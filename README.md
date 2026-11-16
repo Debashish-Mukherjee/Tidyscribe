@@ -8,7 +8,7 @@ Tidyscribe is a self-hosted document productivity application that turns AI-gene
 - Backend: FastAPI + SQLAlchemy with Alembic migrations; Celery + Redis for exports
 - Exports: `markdown-it-py` parser feeding HTML, `python-docx` (DOCX) and `reportlab` (PDF) writers, DejaVu fonts
 - Persistence: PostgreSQL + local filesystem volumes
-- Deployment: Docker Compose (postgres, redis, backend, worker, frontend)
+- Deployment: Docker Compose (postgres, redis, backend, export worker, maintenance worker, scheduler, frontend)
 
 Repository: [Debashish-Mukherjee/Tidyscribe](https://github.com/Debashish-Mukherjee/Tidyscribe)
 
@@ -19,6 +19,8 @@ Repository: [Debashish-Mukherjee/Tidyscribe](https://github.com/Debashish-Mukher
 - [docs/deployment.md](docs/deployment.md) - running, configuration, logging, backups
 - [docs/development.md](docs/development.md) - local setup, tests, conventions
 - [docs/roadmap.md](docs/roadmap.md) - what is done and what is next
+- [docs/conversion.md](docs/conversion.md) - supported constructs and format limitations
+- [docs/validation.md](docs/validation.md) - current validation results and historical findings
 
 ## Quick start
 
@@ -71,7 +73,7 @@ Deferred by request: CI/CD pipelines and security (authentication, RBAC, rate li
 Remaining (from the original specification):
 
 - [ ] Colour emoji in PDFs (emoji are currently dropped rather than rendered)
-- [ ] Retention for old exports
+- [x] Retention for old export files (seven days by default); job metadata is retained
 - [ ] PlantUML use-case diagrams; Markdown-aware syntax highlighting in the editors
 
 Optional extras: set `INSTALL_DOC_TOOLS=true` and `EXPORT_ENGINE=pandoc` to build DOCX with Pandoc and PDF with LibreOffice, with server-side Mermaid rendering; set `SENTRY_DSN` for error tracking. See [docs/deployment.md](docs/deployment.md).

@@ -1,5 +1,8 @@
 # Tidyscribe – Independent UAT / Bug Hunt Report
 
+> Historical baseline. Findings below describe the original UAT run, not the current release. Several defects have since been fixed. See [validation.md](validation.md) for current checks and remaining limitations.
+
+
 Engagement date: 2026-11-02. Target: the stack at `localhost:3000` (frontend) and `localhost:8000` (API), rebuilt from `HEAD` (`f1b757e`) before testing.
 Method: black-box exploration through a real Chromium browser (Playwright), HTTP-level export probing, and inspection of downloaded DOCX/PDF/HTML files. Source code was read only to aim hostile tests, never to decide expected behaviour.
 Evidence: `docs/uat-screenshots/`. Executable suites: `frontend/tests/{smoke,regression,exploratory,destructive,accessibility,performance}`, run with `npm run test:uat` (see [How to run](#how-to-run)).
