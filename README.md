@@ -56,6 +56,7 @@ Done:
 - [x] HTML, DOCX and PDF export with real structure; diagrams embedded as images; Unicode PDF text with an embedded CJK font (WenQuanYi Micro Hei); shaped Arabic and Hebrew with bidirectional layout
 - [x] Smart paste and AI-preamble cleanup / tone transforms
 - [x] Rich paste: formatted text copied from chat UIs, Google Docs, Word or web pages arrives as Markdown (bullets, headings, bold, links, tables, code); Ctrl+Shift+V pastes plain text
+- [x] Local UTF-8 Markdown, text and HTML file import (up to 2 MB), with HTML conversion and unsaved-work protection
 - [x] Diagram conversion: ASCII to Mermaid/SVG/Draw.io; PlantUML (sequence, class, state, activity, component), Draw.io files, Terraform and Kubernetes to Mermaid
 - [x] Editor find/replace (Ctrl+F, regex, match case) and a Rich (TipTap) editing mode that round-trips Markdown
 - [x] Runtime-configurable API URL (`API_URL`), Prometheus `/metrics`, optional Sentry error tracking

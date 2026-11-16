@@ -8,6 +8,7 @@ Status against the original specification. Items are grouped by theme; nothing h
 - HTML, DOCX and PDF export with real structure; diagrams embedded as images; Unicode PDF text.
 - Smart paste and AI cleanup (preamble removal, tone transforms).
 - Rich paste: clipboard HTML is converted to Markdown in the browser (lists, headings, emphasis, links, tables, task lists, code blocks; Google Docs, Word and chat-UI quirks handled). Editor-style HTML and plain text paste unchanged.
+- Local UTF-8 Markdown, text and HTML file import (up to 2 MB). Imports open as new unsaved documents, with save/discard choices before replacing edits.
 - Diagram conversion: ASCII to Mermaid / SVG / Draw.io; PlantUML (sequence, class, state, activity, component), Draw.io files, Terraform and Kubernetes to Mermaid.
 - Editor find/replace and a Rich (TipTap) mode that reads and writes Markdown.
 - Runtime `API_URL` for the frontend image; Prometheus `/metrics`; optional Sentry error tracking.

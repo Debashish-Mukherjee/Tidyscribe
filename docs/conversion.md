@@ -2,6 +2,14 @@
 
 Tidyscribe uses deterministic cleanup rules. Style selection changes heading vocabulary; it does not rewrite prose or generate a design document. Cleanup is reviewed before it is applied.
 
+## File import
+
+Choose **Import** in the editor toolbar to open a UTF-8 `.md`, `.markdown`, `.txt`, `.html` or `.htm` file, up to 2,000,000 bytes (2 MB). Markdown and text retain their contents; a UTF-8 BOM is removed. HTML uses the same sanitized conversion pipeline as rich paste, preserving supported document structure and reporting conversion notices. An imported HTML file's relative links and images are not resolved against its original folder. DOCX and PDF import are not supported.
+
+The original file is read in the browser. Importing does not upload it or create a saved document. Existing unsaved work offers Cancel, Save then open, or Discard and open. Imports start a new unsaved document so saving cannot overwrite the previously opened document. Draft autosave and recovery apply to the imported text as usual. Empty, binary, unsupported, oversized and invalid UTF-8 files leave the editor unchanged.
+
+## Export
+
 The default engine uses the shared document tree. Browser exports submit sanitized preview HTML; API-only exports render Markdown on the server. The optional Pandoc engine consumes Markdown through a separate conversion path, so it has different formatting behavior. A failed optional tool falls back to the built-in writer and logs the reason.
 
 | Feature | Preview / HTML | Built-in DOCX | Built-in PDF |

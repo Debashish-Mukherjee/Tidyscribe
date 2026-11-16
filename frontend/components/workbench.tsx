@@ -8,6 +8,7 @@ import { useUndoableText } from "../lib/history";
 import { backupAndClearDraft, readDraft, readDraftState, writeDraft } from "../lib/drafts";
 import { useExports, type ExportFormat } from "../hooks/use-exports";
 import { useDocumentSession } from "../hooks/use-document-session";
+import type { ImportedFile } from "../lib/import-file";
 import { titleFromMarkdown, slugify, triggerDownload } from "../lib/document";
 import { renderPreview } from "../lib/preview";
 import { armBoot, beginBoot, clearBootMarker, flagCrash, markHealthy } from "../lib/recovery";
@@ -21,6 +22,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { CleanDialog } from "./clean-dialog";
 import { ExportMenu, type ExportChoice } from "./export-menu";
 import { FindBar } from "./find-bar";
+import { ImportFileButton } from "./import-file-button";
 import { RecoveryDialog } from "./recovery-dialog";
 import { ResizeHandle, useElementWidth } from "./resizable";
 import { SafePreview } from "./safe-preview";
@@ -61,6 +63,9 @@ const NARROW_SCREEN = 1100;
 const PANE_MIN = 280;
 const HANDLE_PX = 6;
 const EDITOR_FRACTION_DEFAULT = 0.58;
+
+type SavedDocument = { id: string; title: string; content: string; updated_at?: string | null };
+type OpenTarget = { source: "document"; document: SavedDocument } | { source: "file"; file: ImportedFile };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), Math.max(min, max));
 
@@ -121,7 +126,7 @@ function WorkbenchShell() {
   const [editorFraction, setEditorFraction] = useState(EDITOR_FRACTION_DEFAULT);
   const [restored, setRestored] = useState(false);
   const [cleanPreview, setCleanPreview] = useState<{ before: string; result: TransformResult } | null>(null);
-  const [pendingOpen, setPendingOpen] = useState<{ id: string; title: string; content: string; updated_at?: string | null } | null>(null);
+  const [pendingOpen, setPendingOpen] = useState<OpenTarget | null>(null);
 
   const [panelOpen, setPanelOpen] = useState(true);
   const [expanded, setExpanded] = useState<{ source: string; markdown: string } | null>(null);
@@ -344,10 +349,20 @@ function WorkbenchShell() {
   };
 
   // Opening replaces the editor text, so unsaved work is never discarded without a choice.
-  const openDocument = (saved: { id: string; title: string; content: string; updated_at?: string | null }) => {
-    if (hasUnsavedWork) setPendingOpen(saved);
-    else applyOpen(saved);
+  const applyTarget = (target: OpenTarget) => {
+    if (target.source === "document") applyOpen(target.document);
+    else {
+      history.reset(target.file.content);
+      clearSession();
+      setStatusMessage(target.file.message);
+    }
   };
+
+  const requestOpen = (target: OpenTarget) => {
+    if (hasUnsavedWork) setPendingOpen(target);
+    else applyTarget(target);
+  };
+  const openDocument = (saved: SavedDocument) => requestOpen({ source: "document", document: saved });
 
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const plain = event.clipboardData.getData("text");
@@ -630,6 +645,7 @@ function WorkbenchShell() {
                 </div>
 
                 <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[#30363d] px-3 py-2">
+                  <ImportFileButton onImport={(file) => requestOpen({ source: "file", file })} notify={setStatusMessage} disabled={saving} />
                   <select
                     aria-label="Paste mode"
                     value={pasteMode}
@@ -850,7 +866,7 @@ function WorkbenchShell() {
     {pendingOpen ? (
       <ConfirmDialog
         title="Discard unsaved changes?"
-        message={`You have unsaved changes in the editor. Opening “${pendingOpen.title}” replaces them.`}
+        message={`You have unsaved changes in the editor. Opening “${pendingOpen.source === "document" ? pendingOpen.document.title : pendingOpen.file.name}” replaces them.`}
         actions={[
           {
             label: "Save, then open",
@@ -858,13 +874,13 @@ function WorkbenchShell() {
             onClick: () => {
               const target = pendingOpen;
               setPendingOpen(null);
-              void saveDocument().then((saved) => saved && applyOpen(target));
+              void saveDocument().then((saved) => saved && applyTarget(target));
             },
           },
           {
             label: "Discard and open",
             onClick: () => {
-              applyOpen(pendingOpen);
+              applyTarget(pendingOpen);
               setPendingOpen(null);
             },
           },

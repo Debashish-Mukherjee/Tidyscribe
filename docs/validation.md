@@ -5,10 +5,10 @@ Validated on 16 November 2026 using a dedicated Docker Compose project and Chrom
 | Check | Result |
 | --- | --- |
 | Backend suite | 271 passed, 3 skipped; 93% application line coverage |
-| Frontend unit/component suite | 352 passed across 26 files |
+| Frontend unit/component suite | 369 passed across 28 files |
 | ESLint and TypeScript | Passed |
 | Production frontend build | Passed locally and in the standard Docker image |
-| End-to-end browser suite | 80 passed |
+| End-to-end browser suite | 84 passed |
 | Expanded browser regression suite | 93 passed, including RTL PDF extraction and light-mode code styling |
 | Smoke, accessibility and recovery browser suites | 73 passed, including keyboard focus and reflow at 320, 375, 768, 1280 and 3440 pixels |
 | Targeted performance browser checks | 3 passed: typing in 1,000-line, 10,000-line and diagram-heavy documents stayed within the 1.5-second burst threshold |
@@ -32,7 +32,7 @@ The backend checks include concurrent saves using one revision, stale version re
 | D15 cleanup behavior | Rule-based, reviewed cleanup; vocabulary changes apply to headings and preserve prose. |
 | D16 HTML fidelity | Semantic HTML policy and shared export corpus have regression coverage. |
 | D17 diagrams | Supported ASCII and Unicode structures have tests; unsupported diagram formats remain explicit limitations. |
-| D18 file import | Still future work. |
+| D18 file import | Local UTF-8 Markdown, text and HTML import is implemented; see the file import milestone below. DOCX/PDF import remains unsupported. |
 | D19 empty search results | Distinct search-empty and library-empty messages. |
 | D20 browser history | Sidebar navigation does not yet represent browser history entries. |
 | D21 accessibility / D24 narrow layouts | Keyboard menus and tabs, preview naming, focus indicators and a single-pane narrow layout are implemented. |
@@ -67,3 +67,11 @@ The complete backend suite passed 271 tests (3 optional CLI tests skipped), reta
 The expanded browser regression suite now passes all 93 cases, including the three previously failing assertions. Light-mode code blocks use the existing panel background color. The package audit script continues to report zero known npm or Python package vulnerabilities with the new rendering dependencies.
 
 GitHub alert reconciliation was completed on 16 November 2026 at approximately 07:33 UTC. An authenticated request to the repository’s Dependabot endpoint returned HTTP 200 and zero open alerts, agreeing with the local package audit results. No alerts were dismissed or suppressed by this work. See [dependency-maintenance.md](dependency-maintenance.md) for the scope of this check.
+
+## Local file import milestone
+
+Local UTF-8 Markdown, text and HTML files up to 2 MB now open through the editor's Import action. Markdown/text are preserved, while HTML reuses rich-paste sanitization and conversion. Imports are new unsaved documents; they do not inherit the previously opened document's identity. Save/discard choices protect existing edits, including edits made during an asynchronous file read. Invalid, empty, binary and oversized files leave the editor unchanged.
+
+All 369 frontend unit/component tests passed, including 17 new import cases covering encoding, conversion, limits, cancellation, save failure, document identity and edits made during file reading. ESLint, TypeScript and local/container production builds passed. All 84 end-to-end tests passed, including four new browser import cases covering file selection, HTML safety, cancellation/reselection, rejection and draft recovery after reload. The backend is unchanged; its latest validation remains 271 passed with 3 optional CLI tests skipped.
+
+All 73 smoke, accessibility and recovery browser checks also passed against the updated production image, including keyboard use and narrow-screen reflow. No dependencies or backend behavior changed in this milestone.
