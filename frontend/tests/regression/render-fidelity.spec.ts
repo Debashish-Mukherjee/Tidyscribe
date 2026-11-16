@@ -14,7 +14,7 @@ import {
   deeplyNestedList,
   deeplyNestedQuote,
 } from "../support/corpus";
-import { open, preview, setContent } from "../support/app";
+import { editor, open, preview, setContent } from "../support/app";
 
 async function render(page: Page, markdown: string): Promise<void> {
   await setContent(page, markdown);
@@ -183,7 +183,7 @@ test.describe("Mermaid", () => {
     await render(page, `${FENCE}mermaid\n${MERMAID_VALID.flowchart}\n${FENCE}`);
     await expect(preview(page).locator(".mermaid svg")).toHaveCount(1, { timeout: 20_000 });
     for (let i = 0; i < 5; i += 1) {
-      await page.getByRole("textbox", { name: /paste ai output/i }).press("End");
+      await editor(page).press("End");
       await page.keyboard.type(`\nedit ${i}`);
     }
     await expect(preview(page).locator(".mermaid svg")).toHaveCount(1, { timeout: 20_000 });

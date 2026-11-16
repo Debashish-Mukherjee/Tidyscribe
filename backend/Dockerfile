@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12-slim AS runtime
 
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -13,8 +13,9 @@ RUN for cert in /tmp/custom-certs/*.crt /tmp/custom-certs/*.pem /tmp/custom-cert
 RUN apt-get update -qq \
     && apt-get install -y -qq --no-install-recommends fonts-dejavu-core fonts-dejavu-extra fonts-wqy-microhei \
     && rm -rf /var/lib/apt/lists/*
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt constraints.txt ./
+RUN python -m pip install --no-cache-dir --upgrade pip==26.3 \
+    && pip install --no-cache-dir -r requirements.txt
 
 # Optional higher-fidelity export tools (about 1 GB): docker compose build --build-arg INSTALL_DOC_TOOLS=true worker
 ARG INSTALL_DOC_TOOLS=false
@@ -28,7 +29,19 @@ RUN if [ "$INSTALL_DOC_TOOLS" = "true" ]; then \
       && rm -rf /var/lib/apt/lists/* /root/.npm; \
     fi
 
-COPY . .
+COPY alembic.ini ./
+COPY alembic ./alembic
+COPY app ./app
 
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+
+FROM runtime AS test
+COPY requirements-test.txt ./
+RUN pip install --no-cache-dir -r requirements-test.txt
+COPY tests ./tests
+COPY bench ./bench
+COPY scripts ./scripts
+
+# Keep test frameworks and PDF inspection tools out of the default image.
+FROM runtime AS production

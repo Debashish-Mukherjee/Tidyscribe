@@ -27,5 +27,5 @@ export type ApiSchemas = {
   "TemplateUpdate": { "name"?: string | null; "category"?: string | null; "body"?: string | null; };
   "TransformRequest": { "text": string; "tone"?: "Solution Design" | "HLD" | "LLD" | "ADR" | "RFC" | "Runbook" | "Operational Guide"; };
   "TransformResponse": { "changes"?: Array<ApiSchemas["ChangeOut"]>; "removed"?: number; "changed"?: boolean; "cleaned_text": string; "summary": string; };
-  "ValidationError": { "loc": Array<string | number>; "msg": string; "type": string; };
+  "ValidationError": { "loc": Array<string | number>; "msg": string; "type": string; "input"?: unknown; "ctx"?: Record<string, unknown>; };
 };

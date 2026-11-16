@@ -1,0 +1,20 @@
+# Opt in to a dedicated backend test image; normal services use the production target.
+services:
+  backend-test:
+    profiles: [test]
+    build:
+      context: ./backend
+      target: test
+      additional_contexts:
+        certs: ./certificates
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/docworkbench
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./test-fixtures:/fixtures:ro
+    command: python -m pytest -q --cov=app --cov-report=term-missing

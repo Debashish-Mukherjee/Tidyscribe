@@ -536,7 +536,7 @@ describe("Workbench settings", () => {
 
   it("keeps working when the settings service is down, and says when a save fails", async () => {
     localStorage.setItem("workbench.theme.v1", "light");
-    const original = fake.fetch.getMockImplementation()!;
+    const original = fake.fetch.getMockImplementation() as (url: string, init?: RequestInit) => unknown;
     fake.fetch.mockImplementation(async (url: string, init?: RequestInit) =>
       String(url).includes("/api/settings")
         ? { ok: false, status: 500, statusText: "x", json: async () => ({ detail: "down" }) }

@@ -6,7 +6,7 @@
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-test.txt
 uvicorn app.main:app --reload
 ```
 
@@ -14,17 +14,17 @@ Frontend:
 
 ```bash
 cd frontend
-npm ci --legacy-peer-deps
+npm ci
 npm run dev
 ```
 
 ## Validation
 
-Backend tests run against the Compose Postgres. The image bakes the code in, so rebuild first:
+Backend tests run against the Compose Postgres. The dedicated test image includes tools that are excluded from production. It bakes the code in, so rebuild first:
 
 ```bash
-docker compose build backend
-docker compose run --rm --no-deps backend python -m pytest -q --cov=app --cov-report=term-missing
+docker compose -f docker-compose.yml -f docker-compose.test.yml --profile test build backend-test
+docker compose -f docker-compose.yml -f docker-compose.test.yml --profile test run --rm backend-test
 ```
 
 Frontend (Node 24 is required; `npx -p node@24 -c '...'` works if your system Node is older):
@@ -68,3 +68,17 @@ docker compose run --rm --no-deps -v "$PWD:/workspace" backend python /workspace
 The shared conversion corpus is in `test-fixtures/exports/`. Backend tests check semantic text in HTML, DOCX and PDF; frontend tests check the same source in Preview. The manifest records expected behavior and known format losses. Add a representative case when fixing fidelity bugs.
 
 Browser suites must run against a dedicated Compose project with disposable data. The UAT teardown deletes records created during its run and restores settings; do not run it against a shared installation.
+
+## Dependency boundaries and audits
+
+`backend/requirements.txt` contains runtime dependencies. `requirements-test.txt` adds HTTP test clients, pytest, coverage and PDF inspection. `pytest-asyncio`, authentication libraries and multipart parsing are not installed because the code does not use them. Docker's default `production` target copies application code and migrations only; its `test` target adds test dependencies, tests, benchmarks and scripts. The test Compose override mounts the shared fixtures.
+
+Use Python 3.12 for backend development, matching the container. Frontend validation uses Node.js 24. Clean frontend installs use `npm ci` with normal peer dependency checks.
+
+```bash
+cd frontend
+npm audit
+npm audit --omit=dev
+```
+
+For Python, audit a `pip freeze --all` taken from each built image, using a separate pip-audit environment. Auditing the actual resolved packages covers transitive dependencies; installing the auditor into the application environment can change the packages being audited. See [dependency-maintenance.md](dependency-maintenance.md) for the audited versions and the scoped npm override.

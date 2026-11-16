@@ -9,7 +9,7 @@ See the [project README](../README.md) for the full stack and [development guide
 Use Node.js 24, then run:
 
 ```bash
-npm ci --legacy-peer-deps
+npm ci
 npm run dev
 ```
 

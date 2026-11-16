@@ -1,0 +1,6 @@
+# Test tools are excluded from production images.
+-r requirements.txt
+httpx==0.27.2
+pytest==9.0.3
+pytest-cov==7.0.0
+pypdf==6.21.4

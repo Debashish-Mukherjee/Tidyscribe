@@ -21,6 +21,7 @@ Repository: [Debashish-Mukherjee/Tidyscribe](https://github.com/Debashish-Mukher
 - [docs/roadmap.md](docs/roadmap.md) - what is done and what is next
 - [docs/conversion.md](docs/conversion.md) - supported constructs and format limitations
 - [docs/validation.md](docs/validation.md) - current validation results and historical findings
+- [docs/dependency-maintenance.md](docs/dependency-maintenance.md) - runtime/test boundaries and repeatable audits
 
 ## Quick start
 

@@ -44,3 +44,15 @@ The backend checks include concurrent saves using one revision, stale version re
 The optional Pandoc, LibreOffice and Mermaid CLI integration tests were skipped because those binaries are absent in the standard image. Mocked fallback tests passed. Firefox, WebKit, a two-hour soak and a second physical machine were not tested. Semantic extraction checks cannot establish visual fidelity for every document.
 
 Authentication, ownership and CI remain explicitly deferred. This milestone does not change that deployment scope. Format-specific limitations, including PDF emoji and RTL shaping, are documented in [conversion.md](conversion.md).
+
+## Dependency hardening validation
+
+The subsequent dependency cleanup was validated on 16 November 2026. Clean `npm ci` now runs with normal peer checks. ESLint, TypeScript, 352 unit/component tests, V8 coverage and the production build passed with Vitest 4.1.12 and Vite 8.3.8. The upgraded FastAPI/Starlette stack passed 254 backend tests (3 optional CLI tests skipped), retaining 93% application line coverage. The generated OpenAPI types were refreshed for the updated validation-error schema. All 79 end-to-end tests and 73 smoke/accessibility/recovery checks passed again on the upgraded stack.
+
+The complete npm audit and its production-only subset reported zero known vulnerabilities. Separate audits of the actual frozen packages from the constrained Python runtime and test images also reported zero known vulnerabilities. `pip check` passed for both images. Image inspection confirmed that production excludes test tools and test sources. These are package audits of the standard images, not an audit of the operating system or the optional Pandoc/LibreOffice/Mermaid CLI toolchain.
+
+See [dependency-maintenance.md](dependency-maintenance.md) for versions, the scoped minimatch override and reproducible audit commands. CI and authentication remain deferred.
+
+The expanded browser regression run reproduced the known RTL PDF limitation. A direct before/after probe using the previous and upgraded backend images returned identical reversed Arabic and Hebrew text with `pdftotext`, while Japanese text was preserved. This is a pre-existing export limitation, not a dependency-upgrade regression. The failing fidelity assertions are retained. A stale editor-name selector in the Mermaid repeat-edit regression test was also corrected to use the shared editor locator.
+
+The expanded regression suite also reproduced the known light-mode styling issue: code-block backgrounds match the page background. Browser probes against the previous and upgraded frontend images both returned `rgb(255, 255, 255)` for those backgrounds. These three assertions (two RTL PDF checks and one light-mode styling check) remain failing and were not suppressed. The main run passed 88 cases and stopped at its configured three-failure limit before its final two cases; those remaining cases were run separately and both passed. Across all 93 cases, 90 passed and these three pre-existing assertions remain failing.

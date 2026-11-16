@@ -4,6 +4,6 @@ coverage
 playwright-report
 test-results
 tests
-vitest.config.ts
+vitest.config.*
 playwright.config.ts
 *.log

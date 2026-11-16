@@ -11,7 +11,7 @@ RUN for cert in /tmp/custom-certs/*.crt /tmp/custom-certs/*.pem /tmp/custom-cert
 
 FROM base AS deps
 COPY package.json package-lock.json ./
-RUN npm ci --legacy-peer-deps --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 
 # Hot-reloading dev server: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 FROM deps AS dev
