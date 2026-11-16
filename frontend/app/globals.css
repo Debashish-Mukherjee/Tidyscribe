@@ -100,3 +100,27 @@ select {
 .rich-editor ul[data-type="taskList"] li > label { margin-top: 0.3em; }
 .rich-editor ul[data-type="taskList"] li > div { flex: 1; }
 .rich-editor .selectedCell { background: color-mix(in srgb, var(--primary) 20%, transparent); }
+
+/* One usable pane at a time on narrow screens, without changing desktop sizing. */
+@media (max-width: 899px) {
+  .workbench-header { padding-inline: 8px; gap: 4px; }
+  .workbench-header > div:last-child { gap: 4px; }
+  .workbench-header button { padding-inline: 6px; }
+  .workbench-sidebar { width: 48px !important; position: relative; }
+  .workbench-sidebar[data-open="true"] > div {
+    position: absolute; left: 48px; top: 0; bottom: 0;
+    width: min(280px, calc(100vw - 48px)); z-index: 30;
+    background: var(--background); border-right: 1px solid var(--border);
+  }
+  [role="separator"] { display: none; }
+  .workspace-switch { display: flex; }
+  .clean-controls { max-width: 100%; flex-wrap: wrap; }
+  .workbench-split > section { min-width: 0 !important; width: 100% !important; flex: 1; }
+  .workbench-split[data-view="editor"] > section:last-child,
+  .workbench-split[data-view="preview"] > section:first-child { display: none; }
+}
+
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, [role="separator"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}

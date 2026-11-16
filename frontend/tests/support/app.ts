@@ -6,7 +6,7 @@ import path from "node:path";
 
 export const API_URL = process.env.E2E_API_URL ?? "http://localhost:8000";
 
-export const editor = (page: Page): Locator => page.getByRole("textbox", { name: /paste ai output/i });
+export const editor = (page: Page): Locator => page.getByRole("textbox", { name: /document source|paste ai output/i });
 export const preview = (page: Page): Locator => page.locator(".md-preview");
 export const statusBar = (page: Page): Locator => page.getByRole("status").filter({ hasNotText: /^$/ }).first();
 
@@ -14,7 +14,7 @@ export async function open(page: Page): Promise<void> {
   await page.goto("/");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  await expect(preview(page)).toBeVisible();
+  await expect(preview(page)).toBeAttached();
 }
 
 /** Playwright's fill()/insertText take ~30 s for 4 000 lines in headless Chromium (browser cost, not the app's), so big text is set natively. */

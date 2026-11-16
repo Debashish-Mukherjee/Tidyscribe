@@ -230,6 +230,7 @@ test.describe("zoom, reflow and responsive layout (WCAG 1.4.4 / 1.4.10)", () => 
       expect.soft(overflow, "page scrolls horizontally").toBeLessThanOrEqual(1);
       const editorBox = await editor(page).boundingBox();
       expect.soft(editorBox && editorBox.width, "editor is usably wide (>=240px)").toBeGreaterThanOrEqual(240);
+      if (viewport.width < 900) await page.getByRole("group", { name: "Workspace view" }).getByRole("button", { name: "Preview", exact: true }).click();
       const previewBox = await page.locator(".md-preview").boundingBox();
       expect.soft(previewBox && previewBox.width, "preview is usably wide (>=200px)").toBeGreaterThanOrEqual(200);
       const save = page.getByRole("button", { name: /^Save/ });

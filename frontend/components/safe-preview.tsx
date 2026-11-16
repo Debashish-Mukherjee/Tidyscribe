@@ -2,7 +2,8 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { errorMessage } from "../lib/api";
-import { naturalSize, renderMermaid } from "../lib/diagrams";
+import { naturalSize } from "../lib/diagrams";
+import { cachedDiagram } from "../lib/diagram-cache";
 import { PREVIEW_CSS } from "../lib/preview-styles";
 import type { SafeHtml } from "../lib/sanitize";
 
@@ -39,7 +40,7 @@ export function SafePreview({ html }: { html: SafeHtml }) {
   }, []);
 
   useLayoutEffect(() => {
-    if (bodyRef.current) bodyRef.current.innerHTML = `<article class="md-preview">${html}</article>`;
+    if (bodyRef.current) bodyRef.current.innerHTML = `<article class="md-preview" aria-label="Document preview" dir="auto">${html}</article>`;
   }, [html]);
 
   useEffect(() => {
@@ -47,7 +48,7 @@ export function SafePreview({ html }: { html: SafeHtml }) {
       const source = (block.textContent || "").trim();
       if (!source) return;
 
-      renderMermaid(`mermaid-${index}-${Date.now()}`, source)
+      cachedDiagram(source, `mermaid-${index}-${Date.now()}`)
         .then((svg) => {
           block.innerHTML = naturalSize(svg);
         })

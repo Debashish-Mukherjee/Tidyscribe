@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, ArchiveRestore, Pin, PinOff, Save, Star, Trash2, Undo2 } from "lucide-react";
 import { api, errorMessage, type ClipboardOut, type DocumentOut, type SnippetOut } from "../lib/api";
 import { timeAgo } from "../lib/format";
@@ -17,6 +17,7 @@ export type SidebarPanelProps = {
   getSelection: () => string;
   insert: (text: string, label: string) => void;
   currentDocId: string | null;
+  expectedUpdatedAt?: string | null;
   onOpenDocument: (document: DocumentOut) => void;
   onDocumentDeleted: (id: string) => void;
   notify: (message: string) => void;
@@ -98,12 +99,20 @@ function useDeleteConfirm() {
   return { ask, dialog };
 }
 
-function DocumentsPanel({ currentDocId, onOpenDocument, onDocumentDeleted, notify }: SidebarPanelProps) {
+function DocumentsPanel({ currentDocId, expectedUpdatedAt, onOpenDocument, onDocumentDeleted, notify }: SidebarPanelProps) {
   const [q, setQ] = useState("");
   const search = useDebounced(q);
   const refresh = useRefresh("documents", "versions");
   const confirmDelete = useDeleteConfirm();
-  const documents = useQuery({ queryKey: ["documents", search], queryFn: () => api.documents.list({ q: search }), retry: false, placeholderData: keepPreviousData });
+  const documents = useInfiniteQuery({
+    queryKey: ["documents", search],
+    initialPageParam: 0,
+    placeholderData: keepPreviousData,
+    queryFn: ({ pageParam }) => api.documents.list({ q: search, limit: 50, offset: pageParam }),
+    getNextPageParam: (last, pages) => last.length === 50 ? pages.length * 50 : undefined,
+    retry: false,
+  });
+  const documentRows = documents.data?.pages.flat();
   const versions = useQuery({
     queryKey: ["versions", currentDocId],
     queryFn: () => api.documents.versions(currentDocId as string),
@@ -121,7 +130,7 @@ function DocumentsPanel({ currentDocId, onOpenDocument, onDocumentDeleted, notif
     onError: (error) => notify(`Delete failed: ${errorMessage(error)}`),
   });
   const restore = useMutation({
-    mutationFn: (versionId: string) => api.documents.restore(currentDocId as string, versionId),
+    mutationFn: (versionId: string) => api.documents.restore(currentDocId as string, versionId, expectedUpdatedAt),
     onSuccess: (document) => {
       onOpenDocument(document);
       notify("Version restored");
@@ -135,7 +144,7 @@ function DocumentsPanel({ currentDocId, onOpenDocument, onDocumentDeleted, notif
       <SearchBox value={q} onChange={setQ} placeholder="Search documents" />
       {confirmDelete.dialog}
       {documents.isError && <LoadError what="documents" error={documents.error} onRetry={() => void documents.refetch()} />}
-      {documents.data?.map((document) => (
+      {documentRows?.map((document) => (
         <div key={document.id} className={`group ${rowClass} ${document.id === currentDocId ? "ring-1 ring-[#58a6ff]" : ""}`}>
           <button type="button" className="min-w-0 flex-1 p-1 text-left" aria-label={document.title} title={document.title} onClick={() => onOpenDocument(document)}>
             <span className="block truncate">{document.title}</span>
@@ -148,7 +157,8 @@ function DocumentsPanel({ currentDocId, onOpenDocument, onDocumentDeleted, notif
           </span>
         </div>
       ))}
-      {documents.data?.length === 0 && <Empty>No saved documents yet. Use Save in the header.</Empty>}
+      {documentRows?.length === 0 && <Empty>{search ? "No documents match your search." : "No saved documents yet. Use Save in the header."}</Empty>}
+      {documents.hasNextPage && <button type="button" className={primaryButton} disabled={documents.isFetchingNextPage} onClick={() => void documents.fetchNextPage()}>{documents.isFetchingNextPage ? "Loading…" : "Load more documents"}</button>}
       {currentDocId && (versions.data?.length ?? 0) > 0 && (
         <div className="space-y-1 border-t border-[#30363d] pt-2">
           <div className="text-xs uppercase tracking-wider text-[#8b949e]">Versions</div>

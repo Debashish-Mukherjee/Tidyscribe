@@ -200,3 +200,18 @@ describe("D14 failure handling", () => {
     await waitFor(() => expect(status()).toHaveTextContent("Save failed: Content is too long (limit 2,000,000 characters)"));
   });
 });
+
+it("reloads a saved document draft with its identity and warns when all text is deleted", async () => {
+  const first = setup();
+  await openOther();
+  await userEvent.type(editor(), " pending edit");
+  window.dispatchEvent(new Event("pagehide"));
+  first.unmount();
+  setup();
+  await waitFor(() => expect(editor().value).toContain("pending edit"));
+  await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+  await waitFor(() => expect(fake.db.documents[0].content).toContain("pending edit"));
+  expect(fake.db.documents).toHaveLength(1);
+  await userEvent.clear(editor());
+  expect(beforeUnload()).toBe(true);
+});

@@ -89,7 +89,11 @@ export function createFakeApi(seed: Partial<FakeApi["db"]> = {}): FakeApi {
     if (path.startsWith("/api/templates")) return collection("templates", ["name", "body"], (b) => ({ id: id(), category: "general", ...b }));
     if (path.startsWith("/api/snippets")) return collection("snippets", ["title", "body", "category"], (b) => ({ id: id(), favorite: false, archived: false, tags: [], ...b }));
     if (path.startsWith("/api/clipboard")) return collection("clipboard", ["content"], (b) => ({ id: id(), tags: [], pinned: false, ...b }));
-    if (path === "/api/documents" && method === "GET") return json(200, db.documents.filter((row) => matches(row, q, ["title", "content"])));
+    if (path === "/api/documents" && method === "GET") {
+      const offset = Number(url.searchParams.get("offset") ?? 0);
+      const limit = Number(url.searchParams.get("limit") ?? 100);
+      return json(200, db.documents.filter((row) => matches(row, q, ["title", "content"])).slice(offset, offset + limit));
+    }
     if (path === "/api/documents" && method === "POST") {
       const row = { id: id(), updated_at: null, ...body } as Row;
       db.documents.push(row);

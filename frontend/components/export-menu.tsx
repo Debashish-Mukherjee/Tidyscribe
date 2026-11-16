@@ -15,6 +15,7 @@ const CHOICES: { id: ExportChoice; label: string }[] = [
 
 export function ExportMenu({ onChoose, disabled }: { onChoose: (choice: ExportChoice) => void; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement | null>(null);
   const root = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -23,7 +24,21 @@ export function ExportMenu({ onChoose, disabled }: { onChoose: (choice: ExportCh
       if (!root.current?.contains(event.target as Node)) setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        trigger.current?.focus();
+      }
+      const items = Array.from(root.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]") ?? []);
+      if (!items.length) return;
+      const index = items.indexOf(document.activeElement as HTMLButtonElement);
+      const next = event.key === "ArrowDown" ? (index + 1) % items.length
+        : event.key === "ArrowUp" ? (index + items.length - 1) % items.length
+        : event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : -1;
+      if (next >= 0 && root.current?.contains(document.activeElement)) {
+        event.preventDefault();
+        items[next].focus();
+      }
+      if (event.key === "Tab") setOpen(false);
     };
     document.addEventListener("mousedown", onPointer);
     document.addEventListener("keydown", onKey);
@@ -35,7 +50,7 @@ export function ExportMenu({ onChoose, disabled }: { onChoose: (choice: ExportCh
 
   return (
     <div ref={root} className="relative">
-      <button type="button" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen((value) => !value)} className={btnPrimary}>
+      <button ref={trigger} type="button" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen((value) => !value)} className={btnPrimary}>
         Export
         <ChevronDown className="h-4 w-4" />
       </button>
@@ -48,6 +63,7 @@ export function ExportMenu({ onChoose, disabled }: { onChoose: (choice: ExportCh
               role="menuitem"
               onClick={() => {
                 setOpen(false);
+                trigger.current?.focus();
                 onChoose(choice.id);
               }}
               className="block w-full px-3 py-1.5 text-left text-sm hover:bg-[#161b22]"

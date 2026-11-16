@@ -52,7 +52,7 @@ describe("drafts", () => {
       sessionStorage.setItem("workbench.tab.v1", `tab-${i}`);
       writeDraft(`# ${i}`);
     });
-    expect(Object.keys(JSON.parse(localStorage.getItem("workbench.drafts.v2") ?? "{}")).length).toBeLessThanOrEqual(10);
+    expect(Object.keys(localStorage).filter((key) => key.startsWith("workbench.drafts.v3.")).length).toBeLessThanOrEqual(10);
   });
 
   it("backing up never loses the draft", () => {
@@ -61,4 +61,10 @@ describe("drafts", () => {
     expect(readDraft()).toBeNull();
     expect(localStorage.getItem("workbench.draft.backup.v1")).toBe("# precious");
   });
+});
+
+it("keeps document identity and the saved baseline when recovering edits", async () => {
+  const { readDraftState } = await import("../../lib/drafts");
+  writeDraft("unsaved changes", { id: "document-1", content: "saved text", updated_at: "revision-1" });
+  expect(readDraftState()).toMatchObject({ text: "unsaved changes", document: { id: "document-1", content: "saved text", updated_at: "revision-1" } });
 });

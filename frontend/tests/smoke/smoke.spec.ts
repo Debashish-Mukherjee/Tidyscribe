@@ -80,10 +80,16 @@ test.describe("smoke: the application is alive end to end", () => {
   test("theme toggle cycles and persists across reload", async ({ page }) => {
     await open(page);
     const html = page.locator("html");
-    const before = await html.getAttribute("data-theme");
-    await page.getByRole("button", { name: /^Theme:/ }).click();
+    const toggle = page.getByRole("button", { name: /^Theme:/ });
+    const beforeMode = await toggle.getAttribute("aria-label");
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes("/api/settings/") && response.request().method() === "PUT"),
+      toggle.click(),
+    ]);
+    const afterMode = await toggle.getAttribute("aria-label");
+    expect(afterMode).not.toBe(beforeMode);
+    // Light and system can resolve to the same colour scheme.
     const after = await html.getAttribute("data-theme");
-    expect(after).not.toBe(before);
     await page.reload();
     await expect(html).toHaveAttribute("data-theme", after as string);
     await page.getByRole("button", { name: /^Theme:/ }).click();

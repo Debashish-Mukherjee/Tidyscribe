@@ -527,7 +527,7 @@ test.describe("exports", () => {
     await expect(frame.locator("h2")).toHaveCount(12);
     await expect(frame.locator("table")).toHaveCount(1);
     await expect(frame.locator("blockquote.callout")).toHaveCount(2);
-    await expect(frame.locator("input[type=checkbox]")).toHaveCount(5);
+    await expect(frame.locator("li.task input[type=checkbox]")).toHaveCount(5);
     await expect(frame.locator("pre")).toHaveCount(3);
     const images = frame.locator("img");
     await expect(images).toHaveCount(2);

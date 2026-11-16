@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { clearEditor, editorValue, open, paste, preview } from "../support/app";
 
@@ -26,12 +26,12 @@ Zabbix Proxy -&gt; Zabbix Server</code></pre></div>
 history writes/sec</code></pre><hr><p>Questions answered:</p><ul><li>Did Zabbix produce an event?</li></ul>
 <table><thead><tr><th>Metric</th><th>Type</th></tr></thead><tbody><tr><td>lag</td><td>gauge</td></tr></tbody></table>`;
 
-test("VS Code chat copy with rendered HTML restores code blocks, quotes, lists and tables", async ({ page }) => {
+test("VS Code chat copy with rendered HTML restores code blocks, quotes, lists and tables", async ({ page }, testInfo) => {
   await open(page);
   await clearEditor(page);
   await paste(page, { text: `${sample}`, html: rendered });
   const value = await editorValue(page);
-  writeFileSync("/tmp/uat/paste/chat_rendered_html.md", value);
+  writeFileSync(testInfo.outputPath("chat_rendered_html.md"), value);
   expect(value).toContain("**two parallel outputs**");
   expect(value).toMatch(/```[a-z]*\n {15}\+--> MySQL/);
   expect(value).toContain("> \"Is the stream faithful?\"");
@@ -42,15 +42,14 @@ test("VS Code chat copy with rendered HTML restores code blocks, quotes, lists a
 });
 
 for (const [name, data] of Object.entries(flavours)) {
-  test(`VS Code chat copy (${name}) keeps diagrams, code lists and headings`, async ({ page }) => {
+  test(`VS Code chat copy (${name}) keeps diagrams, code lists and headings`, async ({ page }, testInfo) => {
     await open(page);
     await clearEditor(page);
     await paste(page, data);
     const value = await editorValue(page);
-    mkdirSync("/tmp/uat/paste", { recursive: true });
     const slug = name.replace(/\W+/g, "_");
-    writeFileSync(`/tmp/uat/paste/chat_${slug}.md`, value);
-    await page.screenshot({ path: `/tmp/uat/paste/chat_${slug}.png`, fullPage: true });
+    writeFileSync(testInfo.outputPath(`chat_${slug}.md`), value);
+    await page.screenshot({ path: testInfo.outputPath(`chat_${slug}.png`), fullPage: true });
 
     expect(value).not.toContain("text-decoration");
     expect(value.startsWith("That changes the observability model")).toBe(true);

@@ -1,11 +1,14 @@
 "use client";
 
-import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { api, ApiError, errorMessage, waitForExport, type DiagramTarget, type TransformResult } from "../lib/api";
-import { extractMermaidSources, findDiagramRange, hasPlantUml, mermaidFence, renderDiagramPngs, type DiagramImage } from "../lib/diagrams";
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useDeferredValue, useRef, useState, useSyncExternalStore } from "react";
+import { QueryClient, QueryClientProvider, } from "@tanstack/react-query";
+import { api, errorMessage, type DiagramTarget, type TransformResult } from "../lib/api";
+import { findDiagramRange, hasPlantUml, mermaidFence } from "../lib/diagrams";
 import { useUndoableText } from "../lib/history";
-import { backupAndClearDraft, readDraft, writeDraft } from "../lib/drafts";
+import { backupAndClearDraft, readDraft, readDraftState, writeDraft } from "../lib/drafts";
+import { useExports, type ExportFormat } from "../hooks/use-exports";
+import { useDocumentSession } from "../hooks/use-document-session";
+import { titleFromMarkdown, slugify, triggerDownload } from "../lib/document";
 import { renderPreview } from "../lib/preview";
 import { armBoot, beginBoot, clearBootMarker, flagCrash, markHealthy } from "../lib/recovery";
 import { EMPTY_HTML } from "../lib/sanitize";
@@ -63,7 +66,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 
 const initialContent = `# Executive Summary
 
-This document explains the design of the Tidyscribe and how it helps technical teams convert AI-generated content into reliable documentation.
+This document explains the design of Tidyscribe and how it helps technical teams convert AI-generated content into reliable documentation.
 
 ## Requirements
 
@@ -81,23 +84,6 @@ print("Documentation workflow")
 - [ ] Review architecture
 - [ ] Validate export pipeline
 - [ ] Share final preview`;
-
-type ExportFormat = "html" | "docx" | "pdf";
-type ExportResult = { content: string; blobUrl: string; filename: string; html?: string };
-
-const titleFromMarkdown = (markdown: string) => {
-  const heading = markdown.match(/^#\s+(.+)$/m)?.[1]?.trim();
-  return (heading || "Workbench draft").slice(0, 200);
-};
-
-const slugify = (value: string) => value.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 80) || "document";
-
-const triggerDownload = (url: string, filename: string) => {
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-};
 
 const downloadText = (text: string, filename: string, mediaType: string) => {
   const url = URL.createObjectURL(new Blob([text], { type: mediaType }));
@@ -117,8 +103,7 @@ function WorkbenchShell() {
   const [pasteMode, setPasteMode] = useState<PasteMode>("auto");
   const [activeNav, setActiveNav] = useState("Documents");
   const [statusMessage, setStatusMessage] = useState("Ready to work");
-  const [exportResults, setExportResults] = useState<Partial<Record<ExportFormat, ExportResult>>>({});
-  const [exporting, setExporting] = useState(false);
+  const { exportResults, exporting, runExport, cancelExport, canCancel } = useExports(content, setStatusMessage);
   // False during server render and hydration, true afterwards (DOMPurify and storage need the browser).
   const mounted = useSyncExternalStore(
     () => () => undefined,
@@ -135,23 +120,19 @@ function WorkbenchShell() {
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT);
   const [editorFraction, setEditorFraction] = useState(EDITOR_FRACTION_DEFAULT);
   const [restored, setRestored] = useState(false);
-  const [currentDocId, setCurrentDocId] = useState<string | null>(null);
-  // Content as last stored on the server; differs from the editor when there are unsaved edits.
-  const [savedContent, setSavedContent] = useState<string | null>(null);
-  // The server's `updated_at` for the open document; sent back on save so a newer save elsewhere is detected.
-  const savedUpdatedAt = useRef<string | null>(null);
-  const [saveConflict, setSaveConflict] = useState(false);
   const [cleanPreview, setCleanPreview] = useState<{ before: string; result: TransformResult } | null>(null);
   const [pendingOpen, setPendingOpen] = useState<{ id: string; title: string; content: string; updated_at?: string | null } | null>(null);
-  const hasUnsavedWork = content.trim() !== "" && (currentDocId === null ? content !== initialContent : content !== savedContent);
-  const [saving, setSaving] = useState(false);
+
   const [panelOpen, setPanelOpen] = useState(true);
   const [expanded, setExpanded] = useState<{ source: string; markdown: string } | null>(null);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingCaret = useRef<number | null>(null);
   const [find, setFind] = useState<{ seed: string; nonce: number } | null>(null);
+  const [mobileView, setMobileView] = useState("editor");
   const [richMode, setRichMode] = useState(false);
-  const queryClient = useQueryClient();
+  const { snapshot, restoreSnapshot, currentDocId, savedContent, saving, saveConflict, setSaveConflict,
+    hasUnsavedWork, saveDocument, applyOpen, clearSession } = useDocumentSession(content, initialContent, history.reset, setStatusMessage);
+  const recoverySnapshot = useRef<typeof snapshot>(null);
 
   // After inserting converted text the caret belongs right behind it, not at the end of the document.
   useLayoutEffect(() => {
@@ -194,14 +175,17 @@ function WorkbenchShell() {
     }
     // The ref survives Strict Mode's second effect run, so the marker written by the first run is not mistaken for a crash.
     const boot = (bootRef.current ??= beginBoot());
+    const savedDraft = readDraftState();
+    recoverySnapshot.current = savedDraft?.document ?? null;
     if (boot.recovering) {
-      setRecovery({ draft: readDraft() });
+      setRecovery({ draft: savedDraft?.text ?? null });
       setPreviewHeld(true);
       setStatusMessage("Recovery mode: your saved draft was not loaded");
     } else {
-      const draft = readDraft();
+      const draft = savedDraft?.text ?? null;
       if (draft !== null) {
         history.reset(draft);
+        restoreSnapshot(savedDraft?.document ?? null);
         setStatusMessage("Restored your last draft");
       }
     }
@@ -238,18 +222,18 @@ function WorkbenchShell() {
   useEffect(() => {
     // Autosave stays off in recovery mode so the starter text cannot overwrite the draft being recovered.
     if (!restored || recovery) return;
-    const timer = setTimeout(() => writeDraft(content), 500);
+    const timer = setTimeout(() => writeDraft(content, snapshot), 500);
     return () => clearTimeout(timer);
-  }, [restored, recovery, content]);
+  }, [restored, recovery, content, snapshot]);
 
   // The debounced write above would miss the last keystrokes of a refresh or tab close, so also write when the page hides.
-  const latestContent = useRef(content);
+  const latestDraft = useRef({ content, snapshot });
   useEffect(() => {
-    latestContent.current = content;
+    latestDraft.current = { content, snapshot };
   });
   useEffect(() => {
     if (!restored || recovery) return;
-    const flush = () => writeDraft(latestContent.current);
+    const flush = () => writeDraft(latestDraft.current.content, latestDraft.current.snapshot);
     const onVisibility = () => {
       if (document.visibilityState === "hidden") flush();
     };
@@ -278,7 +262,8 @@ function WorkbenchShell() {
     markHealthy(bootRef.current.id);
   }, [restored, recovery, previewHeld]);
 
-  const preview = useMemo(() => (mounted && !previewHeld ? renderPreview(previewSource) : null), [mounted, previewHeld, previewSource]);
+  const deferredPreviewSource = useDeferredValue(previewSource);
+  const preview = useMemo(() => (mounted && !previewHeld ? renderPreview(deferredPreviewSource) : null), [mounted, previewHeld, deferredPreviewSource]);
 
   const navItems = [
     { label: "Documents", icon: <NotebookText className="h-4 w-4" /> },
@@ -328,13 +313,15 @@ function WorkbenchShell() {
 
   const restoreRecoveredDraft = () => {
     if (bootRef.current) armBoot(bootRef.current.id);
-    if (recovery?.draft?.trim()) history.reset(recovery.draft);
+    if (recovery?.draft !== null && recovery?.draft !== undefined) history.reset(recovery.draft);
+    restoreSnapshot(recoverySnapshot.current);
     setRecovery(null);
     setStatusMessage("Draft restored. The preview is paused until you choose to render it");
   };
 
   const startFresh = () => {
     backupAndClearDraft();
+    clearSession();
     clearBootMarker();
     setRecovery(null);
     setPreviewHeld(false);
@@ -354,54 +341,6 @@ function WorkbenchShell() {
 
   const syncEditorMarkdown = (markdown: string) => {
     setContent(markdown, { checkpoint: true });
-  };
-
-  const persistDocument = async (title: string, options: { force?: boolean; asNew?: boolean } = {}) => {
-    const store = async () => {
-      if (currentDocId && !options.asNew) {
-        try {
-          return await api.documents.update(currentDocId, { title, content, expected_updated_at: options.force ? undefined : savedUpdatedAt.current });
-        } catch (error) {
-          if (!(error instanceof ApiError && error.status === 404)) throw error;
-        }
-      }
-      const created = await api.documents.create({ title, content });
-      setCurrentDocId(created.id);
-      return created;
-    };
-    const stored = await store();
-    setSavedContent(content);
-    savedUpdatedAt.current = stored.updated_at ?? null;
-    void queryClient.invalidateQueries({ queryKey: ["documents"] });
-    void queryClient.invalidateQueries({ queryKey: ["versions"] });
-    return stored;
-  };
-
-  const saveDocument = async (options: { force?: boolean; asNew?: boolean } = {}) => {
-    setSaving(true);
-    try {
-      const saved = await persistDocument(titleFromMarkdown(content), options);
-      setStatusMessage(`Saved “${saved.title}”`);
-      return true;
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
-        setSaveConflict(true);
-        setStatusMessage("Not saved: this document was changed somewhere else");
-      } else {
-        setStatusMessage(`Save failed: ${errorMessage(error)}`);
-      }
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const applyOpen = (saved: { id: string; title: string; content: string; updated_at?: string | null }) => {
-    history.reset(saved.content);
-    setCurrentDocId(saved.id);
-    setSavedContent(saved.content);
-    savedUpdatedAt.current = saved.updated_at ?? null;
-    setStatusMessage(`Opened “${saved.title}”`);
   };
 
   // Opening replaces the editor text, so unsaved work is never discarded without a choice.
@@ -511,55 +450,6 @@ function WorkbenchShell() {
     }
   };
 
-  const runExport = async (format: ExportFormat, download = false) => {
-    if (!content.trim()) {
-      setStatusMessage("Add content before exporting");
-      return;
-    }
-
-    setExporting(true);
-    try {
-      setStatusMessage(`Creating ${format.toUpperCase()} export…`);
-      const title = titleFromMarkdown(content);
-
-      let diagrams: DiagramImage[] = [];
-      let failedDiagrams = 0;
-      // The backend expands PlantUML the same way, so Mermaid sources match the rendered images.
-      const expandedMarkdown = hasPlantUml(content) ? (await api.expandDiagrams(content)).markdown : content;
-      if (extractMermaidSources(expandedMarkdown).length > 0) {
-        setStatusMessage("Rendering diagrams…");
-        ({ images: diagrams, failed: failedDiagrams } = await renderDiagramPngs(expandedMarkdown));
-      }
-
-      // Exports are built from the editor text and never save or create a document. The Preview's own HTML goes along so
-      // every format follows what the user saw, not a second rendering of the Markdown.
-      const rendered = renderPreview(expandedMarkdown);
-      const queued = await api.exports.create({ title, content, html: rendered.ok ? rendered.html : undefined, format, diagrams });
-      const job = await waitForExport(queued, {
-        onStatus: (status) => setStatusMessage(status === "processing" ? `Generating ${format.toUpperCase()}…` : `${format.toUpperCase()} export queued…`),
-      });
-
-      const file = await fetch(job.file_url as string);
-      if (!file.ok) throw new Error(`download failed (${file.status})`);
-      const blob = await file.blob();
-      const filename = `${slugify(title)}.${format}`;
-
-      const previous = exportResults[format];
-      if (previous) URL.revokeObjectURL(previous.blobUrl);
-      const blobUrl = URL.createObjectURL(blob);
-      const html = format === "html" ? await blob.text() : undefined;
-      setExportResults((current) => ({ ...current, [format]: { content, blobUrl, filename, html } }));
-
-      const note = failedDiagrams > 0 ? ` (${failedDiagrams} diagram(s) could not be rendered and were included as source)` : "";
-      setStatusMessage(`${format.toUpperCase()} export ready: ${filename}${note}`);
-      if (download) triggerDownload(blobUrl, filename);
-    } catch (error) {
-      setStatusMessage(`Export failed: ${errorMessage(error)}`);
-    } finally {
-      setExporting(false);
-    }
-  };
-
   const handleTabClick = (tab: string) => {
     setSelectedPreview(tab);
     if (tab === "Preview") return;
@@ -597,8 +487,9 @@ function WorkbenchShell() {
   return (
     <>
     <div inert={recovery !== null}>
+      <a href="#document-editor" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-[#0d1117] focus:p-3">Skip to editor</a>
       <div className="flex h-screen min-h-[520px] flex-col bg-[#0d1117] text-[#c9d1d9]">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[#30363d] bg-[#161b22]/90 px-4">
+        <header className="workbench-header flex h-14 shrink-0 items-center gap-3 border-b border-[#30363d] bg-[#161b22]/90 px-4">
           <div className="flex shrink-0 items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#58a6ff]/15 text-[#58a6ff]">
               <FileText className="h-4 w-4" />
@@ -627,6 +518,7 @@ function WorkbenchShell() {
               <Save className="h-4 w-4" />
               Save
             </button>
+            {canCancel && <button type="button" onClick={() => void cancelExport()} className={btnSecondary}>Cancel export</button>}
             <ExportMenu onChoose={handleExportChoice} disabled={exporting} />
             <button type="button" onClick={() => void handleCopyMarkdown()} aria-label="Copy Markdown" title="Copy the Markdown source to the clipboard" className={btnGhost}>
               <Copy className="h-4 w-4" />
@@ -643,7 +535,7 @@ function WorkbenchShell() {
         </header>
 
         <div className="flex min-h-0 flex-1">
-          <aside style={{ width: panelOpen ? sidebarWidth : RAIL_WIDTH }} className="flex shrink-0 bg-[#0d1117]">
+          <aside data-open={panelOpen} style={{ width: panelOpen ? sidebarWidth : RAIL_WIDTH }} className="workbench-sidebar flex shrink-0 bg-[#0d1117]">
             <nav aria-label="Sections" className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-[#30363d] py-2">
               {navItems.map((item) => (
                 <button
@@ -674,12 +566,11 @@ function WorkbenchShell() {
                     getSelection={getSelection}
                     insert={insertIntoEditor}
                     currentDocId={currentDocId}
+                    expectedUpdatedAt={snapshot?.updated_at}
                     onOpenDocument={openDocument}
                     onDocumentDeleted={(id) => {
                       if (id !== currentDocId) return;
-                      setCurrentDocId(null);
-                      setSavedContent(null);
-                      savedUpdatedAt.current = null;
+                      clearSession();
                     }}
                     notify={setStatusMessage}
                     preferences={{ theme: themeMode, onThemeChange: changeTheme, tone: selectedTone, onToneChange: changeTone, onResetLayout: resetLayout }}
@@ -703,7 +594,10 @@ function WorkbenchShell() {
           )}
 
           <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <div ref={splitRef} className="flex min-h-0 min-w-0 flex-1">
+            <div role="group" aria-label="Workspace view" className="workspace-switch hidden border-b border-[#30363d] p-1">
+              {["editor", "preview"].map((view) => <button key={view} type="button" aria-pressed={mobileView === view} onClick={() => setMobileView(view)} className={btnGhost}>{view === "editor" ? "Editor" : "Preview"}</button>)}
+            </div>
+            <div ref={splitRef} data-view={mobileView} className="workbench-split flex min-h-0 min-w-0 flex-1">
               <section style={{ width: `${editorFraction * 100}%`, minWidth: PANE_MIN }} className="flex shrink-0 flex-col bg-[#0d1117]">
                 <div className="flex h-11 shrink-0 items-center justify-between border-b border-[#30363d] px-3 text-sm text-[#8b949e]">
                   <div className="flex items-center gap-2">
@@ -754,12 +648,12 @@ function WorkbenchShell() {
                     <FileCode2 className="h-4 w-4" />
                     Smart Paste
                   </button>
-                  <div className="inline-flex items-stretch rounded border border-[#30363d]">
+                  <div className="clean-controls inline-flex items-stretch rounded border border-[#30363d]">
                     <select
                       aria-label="Writing style"
                       value={selectedTone}
                       onChange={(event) => isTone(event.target.value) && changeTone(event.target.value)}
-                      title="Writing style applied by Clean AI Text"
+                      title="Heading vocabulary applied by Clean AI Text; prose is preserved"
                       className="rounded-l bg-[#0d1117] px-2 py-1.5 text-sm text-[#c9d1d9]"
                     >
                       {TONES.map((tone) => (
@@ -768,7 +662,7 @@ function WorkbenchShell() {
                         </option>
                       ))}
                     </select>
-                    <button onClick={handleClean} title="Remove AI preambles and apply the writing style" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-r border-l border-[#30363d] px-3 py-1.5 text-sm font-medium hover:bg-[#161b22]">
+                    <button onClick={handleClean} title="Remove AI preambles and adjust heading vocabulary" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-r border-l border-[#30363d] px-3 py-1.5 text-sm font-medium hover:bg-[#161b22]">
                       <Wand2 className="h-4 w-4" />
                       Clean AI Text
                     </button>
@@ -808,6 +702,8 @@ function WorkbenchShell() {
                   </Suspense>
                 ) : (
                 <textarea
+                  id="document-editor"
+                  aria-label="Document source"
                   ref={editorRef}
                   value={content}
                   onChange={(event) => setContent(event.target.value)}
@@ -855,7 +751,20 @@ function WorkbenchShell() {
                     <button
                       key={tab}
                       role="tab"
+                      id={`preview-tab-${tab}`}
+                      aria-controls="preview-panel"
+                      tabIndex={selectedPreview === tab ? 0 : -1}
                       aria-selected={selectedPreview === tab}
+                      onKeyDown={(event) => {
+                        const index = previewTabs.indexOf(tab);
+                        const next = event.key === "ArrowRight" ? (index + 1) % previewTabs.length
+                          : event.key === "ArrowLeft" ? (index + previewTabs.length - 1) % previewTabs.length
+                          : event.key === "Home" ? 0 : event.key === "End" ? previewTabs.length - 1 : -1;
+                        if (next < 0) return;
+                        event.preventDefault();
+                        setSelectedPreview(previewTabs[next]);
+                        document.getElementById(`preview-tab-${previewTabs[next]}`)?.focus();
+                      }}
                       onClick={() => handleTabClick(tab)}
                       className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm ${selectedPreview === tab ? "border-[#58a6ff] font-medium text-[#58a6ff]" : "border-transparent text-[#8b949e] hover:bg-[#161b22]"}`}
                     >
@@ -864,7 +773,7 @@ function WorkbenchShell() {
                   ))}
                 </div>
 
-                <div className={`min-h-0 flex-1 ${selectedPreview === "Preview" ? "overflow-auto" : "flex flex-col overflow-hidden"}`}>
+                <div id="preview-panel" role="tabpanel" aria-labelledby={`preview-tab-${selectedPreview}`} className={`min-h-0 flex-1 ${selectedPreview === "Preview" ? "overflow-auto" : "flex flex-col overflow-hidden"}`}>
                 {selectedPreview === "Preview" ? (
                   <div className="mx-auto max-w-3xl px-6 py-4">
                     {previewHeld ? (

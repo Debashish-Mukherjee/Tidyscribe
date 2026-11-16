@@ -226,3 +226,12 @@ describe("Settings panel", () => {
     expect(screen.getByText("Settings are not available.")).toBeInTheDocument();
   });
 });
+
+it("loads documents beyond the first page", async () => {
+  const documents = Array.from({ length: 51 }, (_, index) => ({ id: `p-${index}`, title: `Page document ${index}`, content: "text" }));
+  renderPanel("Documents", {}, { documents });
+  await screen.findByRole("button", { name: "Page document 0" });
+  expect(screen.queryByRole("button", { name: "Page document 50" })).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Load more documents" }));
+  expect(await screen.findByRole("button", { name: "Page document 50" })).toBeInTheDocument();
+});

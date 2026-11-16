@@ -65,7 +65,7 @@ export default function RichEditor({ value, onChange }: Props) {
       Placeholder.configure({ placeholder: "Start writing…" }),
     ],
     content: markdownToEditorHtml(value),
-    editorProps: { attributes: { class: "md-preview rich-editor mx-auto min-h-full max-w-3xl px-6 py-4 outline-none", "aria-label": "Rich text editor" } },
+    editorProps: { attributes: { class: "md-preview rich-editor mx-auto min-h-full max-w-3xl px-6 py-4 outline-none", "aria-label": "Rich text editor", id: "document-editor" } },
     onUpdate: ({ editor: current }) => {
       const markdown = editorHtmlToMarkdown(current.getHTML());
       synced.current = markdown;
